@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 type View = "default" | "loading" | "recovery" | "claimed" | "error" | "empty" | "exit";
 type Claim = "Morrow" | "Field Notes" | "Ritual";
+type Density = "compact" | "roomy";
 
 const viewNames: Record<View, string> = {
   default: "Best match",
@@ -57,6 +58,7 @@ function SocksArtwork() {
 
 export default function Home() {
   const [view, setView] = useState<View>("default");
+  const [density, setDensity] = useState<Density>("compact");
   const [claimedBrand, setClaimedBrand] = useState<Claim>("Morrow");
   const [copied, setCopied] = useState(false);
   const [events, setEvents] = useState<string[]>(["widget_viewed"]);
@@ -90,6 +92,11 @@ export default function Home() {
     track(`demo_state:${next}`);
   };
 
+  const chooseDensity = (next: Density) => {
+    setDensity(next);
+    track(`demo_layout:${next}`);
+  };
+
   const copyCode = async () => {
     try {
       await navigator.clipboard.writeText("NOMA20");
@@ -101,7 +108,7 @@ export default function Home() {
   };
 
   return (
-    <main>
+    <main className={`layout-${density}`}>
       <header className="site-header">
         <a className="wordmark" href="#top" aria-label="Noma home">NOMA</a>
         <nav aria-label="Order navigation">
@@ -153,7 +160,7 @@ export default function Home() {
                 <h2>Because you chose the trail runner.</h2>
                 <p>Meet the bottle built for the miles ahead.</p>
               </div>
-              <BottleArtwork />
+              <BottleArtwork compact={density === "compact"} />
               <div className="offer-copy">
                 <div>
                   <p className="partner-name">Morrow</p>
@@ -264,11 +271,20 @@ export default function Home() {
         <p>© 2026 Noma Supply Co.</p>
       </footer>
 
-      <div className="demo-controller">
-        <label htmlFor="demo-state">Prototype state</label>
-        <select id="demo-state" value={view} onChange={(event) => chooseView(event.target.value as View)}>
-          {(Object.keys(viewNames) as View[]).map((key) => <option key={key} value={key}>{viewNames[key]}</option>)}
-        </select>
+      <div className="demo-controller" aria-label="Prototype controls">
+        <div className="controller-field">
+          <label htmlFor="demo-layout">Layout</label>
+          <select id="demo-layout" value={density} onChange={(event) => chooseDensity(event.target.value as Density)}>
+            <option value="compact">Space-aware</option>
+            <option value="roomy">Roomy</option>
+          </select>
+        </div>
+        <div className="controller-field">
+          <label htmlFor="demo-state">State</label>
+          <select id="demo-state" value={view} onChange={(event) => chooseView(event.target.value as View)}>
+            {(Object.keys(viewNames) as View[]).map((key) => <option key={key} value={key}>{viewNames[key]}</option>)}
+          </select>
+        </div>
         <div className="event-log" aria-label="Recent prototype events">
           <span className="event-dot" />
           <span>{events[0]}</span>

@@ -218,17 +218,114 @@ footer a { color: var(--ink); }
   z-index: 20;
   right: 18px;
   bottom: 18px;
-  width: 190px;
+  width: 214px;
   padding: 12px;
   background: #1d201c;
   color: white;
   box-shadow: 0 8px 35px rgba(24, 25, 22, .22);
 }
-.demo-controller label { display: block; margin-bottom: 7px; color: #b8bcb5; font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.controller-field + .controller-field { margin-top: 9px; }
+.demo-controller label { display: block; margin-bottom: 5px; color: #b8bcb5; font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .demo-controller select { width: 100%; padding: 7px 9px; border: 1px solid #555a52; border-radius: 0; background: #2b2f29; color: white; font-size: 11px; }
 .event-log { min-width: 0; display: flex; align-items: center; gap: 6px; margin-top: 8px; color: #90968d; font-family: ui-monospace, monospace; font-size: 8px; }
 .event-log span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .event-dot { flex: 0 0 auto; width: 5px; height: 5px; border-radius: 50%; background: #90b876; }
+
+/* Compact is the production-minded embed: it respects the space a merchant
+   confirmation page can realistically give a third-party surface. */
+.layout-compact .confirmation {
+  width: min(1080px, calc(100% - 48px));
+  grid-template-columns: minmax(0, 1fr) minmax(400px, 440px);
+  min-height: 610px;
+}
+.layout-compact .receipt-column {
+  padding: 72px clamp(46px, 7vw, 90px) 64px 0;
+}
+.layout-compact .order-card { margin-top: 52px; }
+.layout-compact .offer-column {
+  align-self: start;
+  padding: 72px 0 64px 54px;
+}
+.layout-compact .offer-kicker { margin-bottom: 12px; }
+.layout-compact .offer-panel {
+  min-height: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--white);
+}
+.layout-compact .primary-offer {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  grid-template-areas:
+    "art intro"
+    "art copy"
+    "actions actions"
+    "disclosure disclosure";
+  column-gap: 18px;
+  align-items: start;
+}
+.layout-compact .offer-intro { grid-area: intro; }
+.layout-compact .offer-intro .eyebrow { margin-bottom: 7px; font-size: 8px; }
+.layout-compact .offer-intro h2 { margin-bottom: 7px; font-size: 25px; line-height: 1.02; }
+.layout-compact .offer-intro > p:last-child { margin-bottom: 11px; font-size: 10px; line-height: 1.4; }
+.layout-compact .art-morrow {
+  grid-area: art;
+  width: 116px;
+  height: 153px;
+  margin: 0;
+}
+.layout-compact .bottle { width: 48px; height: 96px; bottom: 19px; border-radius: 14px 14px 12px 12px; }
+.layout-compact .bottle-cap { width: 29px; height: 12px; left: 10px; top: -8px; }
+.layout-compact .bottle span { font-size: 25px; }
+.layout-compact .bottle-shadow { width: 92px; height: 22px; bottom: 11px; }
+.layout-compact .art-label { top: 10px; left: 11px; font-size: 6px; }
+.layout-compact .offer-copy { grid-area: copy; align-self: end; }
+.layout-compact .offer-copy h3 { font-size: 14px; }
+.layout-compact .offer-detail { font-size: 9px; }
+.layout-compact .expiry { display: none; }
+.layout-compact .offer-actions { grid-area: actions; margin-top: 15px; }
+.layout-compact .button { min-height: 40px; }
+.layout-compact .disclosure { grid-area: disclosure; margin-top: 9px; font-size: 8px; }
+.layout-compact .recovery { padding: 0; border: 1px solid var(--line); background: var(--white); }
+.layout-compact .recovery-heading { margin: 0; padding: 14px 16px 12px; }
+.layout-compact .recovery-heading .eyebrow { margin-bottom: 6px; font-size: 8px; }
+.layout-compact .recovery-heading h2 { font-size: 25px; }
+.layout-compact .recovery-heading button { margin-bottom: 2px; }
+.layout-compact .alternative-card {
+  min-height: 110px;
+  grid-template-columns: 116px 1fr;
+  border-top: 1px solid #e3dfd6;
+  border-bottom: 0;
+  background: var(--white);
+}
+.layout-compact .alternative-card .art { height: 109px; }
+.layout-compact .alternative-copy { padding: 12px 14px; }
+.layout-compact .alternative-copy h3 { font-size: 13px; }
+.layout-compact .alternative-copy > p { font-size: 9px; }
+.layout-compact .alternative-copy .button { min-height: 29px; margin-top: 8px; padding: 0 13px; font-size: 9px; }
+.layout-compact .journal { width: 44px; height: 64px; top: 18px; padding: 8px 6px; }
+.layout-compact .journal span { font-size: 8px; }
+.layout-compact .journal-shadow { width: 62px; bottom: 13px; }
+.layout-compact .pencil { width: 3px; height: 63px; left: calc(50% + 20px); top: 20px; }
+.layout-compact .sock { width: 27px; height: 62px; top: 15px; padding-top: 7px; font-size: 9px; }
+.layout-compact .sock::after { width: 32px; height: 17px; }
+.layout-compact .sock-one { left: calc(50% - 26px); }
+.layout-compact .sock-two { left: calc(50% + 1px); top: 23px; }
+.layout-compact .recovery > .disclosure { padding: 10px 14px; margin: 0; border-top: 1px solid #e3dfd6; }
+.layout-compact .status-panel {
+  min-height: 304px;
+  padding: 28px;
+  background: var(--cream);
+}
+.layout-compact .status-panel .status-icon { width: 34px; height: 34px; margin-bottom: 22px; font-size: 13px; }
+.layout-compact .status-panel h2 { font-size: 30px; }
+.layout-compact .status-panel > p:not(.eyebrow) { margin-bottom: 18px; font-size: 11px; }
+.layout-compact .status-panel .button { margin-top: 8px; }
+.layout-compact .loading-lines { margin-top: 28px; }
+.layout-compact .loading-mark { margin-bottom: 17px; }
+.layout-compact .error-panel { background: #eee4db; }
+.layout-compact .empty-panel,
+.layout-compact .exit-panel { background: #e3e7dc; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes search { 0%, 100% { opacity: .3; transform: scaleY(.7); } 50% { opacity: 1; transform: scaleY(1); } }
@@ -283,9 +380,38 @@ footer a { color: var(--ink); }
   .sock-two { left: calc(50% + 1px); top: 29px; }
   .status-panel { min-height: 430px; padding: 34px 28px; }
   footer { display: none; }
-  .demo-controller { left: 12px; right: 12px; bottom: 10px; width: auto; display: grid; grid-template-columns: 82px 1fr; align-items: center; gap: 8px; padding: 9px 10px; }
-  .demo-controller label { margin: 0; }
+  .demo-controller { left: 12px; right: 12px; bottom: 10px; width: auto; display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 8px; padding: 9px 10px; }
+  .controller-field + .controller-field { margin-top: 0; }
   .event-log { display: none; }
+
+  .layout-compact .confirmation { width: 100%; min-height: auto; }
+  .layout-compact .receipt-column { padding: 24px 18px 0; }
+  .layout-compact .order-card { margin-top: 20px; }
+  .layout-compact .offer-column { padding: 22px 18px 100px; }
+  .layout-compact .offer-panel { padding: 13px; }
+  .layout-compact .primary-offer {
+    grid-template-columns: 94px minmax(0, 1fr);
+    grid-template-areas:
+      "art intro"
+      "art copy"
+      "actions actions"
+      "disclosure disclosure";
+    column-gap: 13px;
+  }
+  .layout-compact .art-morrow { width: 94px; height: 126px; }
+  .layout-compact .bottle { width: 40px; height: 80px; bottom: 15px; }
+  .layout-compact .bottle-cap { width: 24px; height: 10px; left: 8px; top: -7px; }
+  .layout-compact .bottle span { font-size: 21px; }
+  .layout-compact .art-label { display: none; }
+  .layout-compact .offer-intro .eyebrow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .layout-compact .offer-intro h2 { font-size: 22px; }
+  .layout-compact .offer-intro > p:last-child { display: none; }
+  .layout-compact .offer-copy { align-self: center; }
+  .layout-compact .offer-actions { margin-top: 12px; }
+  .layout-compact .offer-actions .button { min-height: 39px; }
+  .layout-compact .alternative-card { min-height: 104px; grid-template-columns: 102px 1fr; }
+  .layout-compact .alternative-card .art { height: 103px; }
+  .layout-compact .status-panel { min-height: 280px; padding: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
