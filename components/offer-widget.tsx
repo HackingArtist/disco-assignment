@@ -142,12 +142,20 @@ function OfferLogo({ asset }: { asset: AssetReference }) {
 }
 
 function WidgetFooter({ config }: { config: WidgetConfiguration }) {
+  const [failedLogo, setFailedLogo] = useState(false);
+  const logo = config.merchant.logo;
+  const showLogo = logo.kind !== "fallback" && Boolean(logo.src) && !failedLogo;
+
   return (
     <footer className="ow-widget-footer">
-      <p className="ow-powered-by" aria-label="Powered by Disco">
+      <p className="ow-powered-by" aria-label={`Powered by ${config.merchant.name}`}>
         <span>Powered by</span>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/disco-logo.png" alt="" />
+        {showLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logo.src} alt="" onError={() => setFailedLogo(true)} />
+        ) : (
+          <strong className="ow-powered-by-wordmark">{config.merchant.wordmark}</strong>
+        )}
       </p>
       {config.behavior.showDisclosure && <p className="ow-disclosure">{config.disclosure}</p>}
     </footer>
@@ -246,7 +254,6 @@ export function OfferWidget({
               />
             </svg>
           </div>
-          <p className="ow-eyebrow">One sec</p>
           <h2>Checking your other unlocked perks…</h2>
           <p>These benefits come with your order.</p>
           <div className="ow-loading-lines"><i /><i /><i /></div>
@@ -303,7 +310,6 @@ export function OfferWidget({
       {state === "error" && (
         <section className="ow-panel ow-status-panel ow-error-panel" aria-live="polite">
           <span className="ow-status-icon">↻</span>
-          <p className="ow-eyebrow">Sorry about that</p>
           <h2>That didn&apos;t work.</h2>
           <p>Your order is safe. Want to try again?</p>
           <div className="ow-status-actions">
@@ -316,7 +322,6 @@ export function OfferWidget({
       {state === "empty" && (
         <section className="ow-panel ow-status-panel ow-empty-panel" aria-live="polite">
           <span className="ow-status-icon">✦</span>
-          <p className="ow-eyebrow">That&apos;s all</p>
           <h2>Nothing else for now.</h2>
           <p>Enjoy your new runners.</p>
           <button className="ow-text-action" type="button" onClick={() => moveTo("default")}>Return to order</button>
@@ -326,7 +331,6 @@ export function OfferWidget({
       {state === "exit" && (
         <section className="ow-panel ow-status-panel ow-exit-panel" aria-live="polite">
           <span className="ow-status-icon">✓</span>
-          <p className="ow-eyebrow">All good</p>
           <h2>Enjoy your order.</h2>
           <p>Thanks for letting us know.</p>
           <button className="ow-text-action" type="button" onClick={() => moveTo("default")}>Undo</button>

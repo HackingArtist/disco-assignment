@@ -12,6 +12,7 @@ import {
   RotateCcw,
   SlidersHorizontal,
   Smartphone,
+  Sparkles,
   Upload,
 } from "lucide-react";
 
@@ -46,6 +47,7 @@ import {
   type WidgetConfiguration,
   type WidgetEvent,
   type WidgetState,
+  type WidgetTheme,
 } from "@/lib/widget-config";
 
 interface FieldProps {
@@ -272,6 +274,156 @@ function CssEditor({
   );
 }
 
+async function readImageAsDataUrl(file: File): Promise<string> {
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Could not read that image."));
+      img.src = sourceUrl;
+    });
+    const maxDimension = 1024;
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas is unavailable in this browser.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.85);
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+function ThemeFromImage({
+  idPrefix,
+  onApply,
+}: {
+  idPrefix: string;
+  onApply: (patch: Partial<WidgetTheme>) => void;
+}) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [applied, setApplied] = useState<{ colors: string[]; fonts: string } | null>(null);
+
+  const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError("Upload a PNG, JPEG, or WebP screenshot.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Keep screenshots under 10 MB.");
+      return;
+    }
+    setError("");
+    try {
+      const dataUrl = await readImageAsDataUrl(file);
+      setPreview(dataUrl);
+      setBusy(true);
+      setApplied(null);
+      const response = await fetch("/api/extract-theme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        theme?: Partial<WidgetTheme>;
+        error?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Could not read the image. Try again.");
+      }
+      const patch = payload?.theme ?? {};
+      onApply(patch);
+      const headingLabel = patch.primaryFont ? googleFontLabels[patch.primaryFont] : "";
+      const bodyLabel = patch.secondaryFont ? googleFontLabels[patch.secondaryFont] : "";
+      setApplied({
+        colors: [patch.page, patch.surface, patch.text, patch.primary, patch.accent, patch.border]
+          .filter((color): color is string => Boolean(color)),
+        fonts: [headingLabel, bodyLabel].filter(Boolean).join(" + "),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not read the image. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clear = () => {
+    setPreview(null);
+    setApplied(null);
+    setError("");
+  };
+
+  return (
+    <section className="studio-theme-group" aria-labelledby={`${idPrefix}-heading-from-image`}>
+      <div className="studio-theme-group-heading">
+        <h3 id={`${idPrefix}-heading-from-image`}>Generate from image</h3>
+      </div>
+      <p className="studio-theme-image-copy">
+        Upload a UI screenshot and the studio will fill the color and typography tokens from it.
+      </p>
+      {preview ? (
+        <div className="studio-theme-image-result">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="studio-theme-image-thumb" src={preview} alt="Theme source screenshot" />
+          <div className="studio-theme-image-meta">
+            {busy ? (
+              <p className="studio-theme-image-status">Reading design…</p>
+            ) : applied ? (
+              <>
+                <div className="studio-palette" aria-label="Extracted palette">
+                  {applied.colors.map((color) => (
+                    <span key={color} className="studio-palette-swatch" style={{ background: color }} title={color} />
+                  ))}
+                </div>
+                {applied.fonts && <p className="studio-theme-image-status">Applied {applied.fonts} typography.</p>}
+              </>
+            ) : null}
+            <div className="asset-actions">
+              <label className="asset-upload-button" htmlFor={`${idPrefix}-theme-image`}>
+                <Upload aria-hidden="true" /> Try another
+              </label>
+              <Button type="button" variant="outline" size="sm" onClick={clear} disabled={busy}>
+                <RotateCcw data-icon="inline-start" /> Clear
+              </Button>
+            </div>
+            <input
+              id={`${idPrefix}-theme-image`}
+              className="sr-only"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleFile}
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          <label className="asset-upload-button studio-theme-image-upload" htmlFor={`${idPrefix}-theme-image`}>
+            <Sparkles aria-hidden="true" /> Upload screenshot
+          </label>
+          <input
+            id={`${idPrefix}-theme-image`}
+            className="sr-only"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={handleFile}
+          />
+        </>
+      )}
+      {error && <p className="studio-error">{error}</p>}
+    </section>
+  );
+}
+
 function AssetField({ id, label, asset, onChange }: AssetFieldProps) {
   const [error, setError] = useState("");
   const validUrl = isValidImageUrl(asset.kind === "url" ? asset.src : "");
@@ -412,6 +564,9 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
     ...current,
     behavior: { ...current.behavior, [key]: value },
   }));
+  const applyThemePatch = (patch: Partial<WidgetTheme>) => {
+    setConfig((current) => ({ ...current, theme: { ...current.theme, ...patch } }));
+  };
   const textContrast = contrastRatio(config.theme.text, config.theme.surface);
   const buttonContrast = contrastRatio(config.theme.primaryText, config.theme.primary);
 
@@ -451,6 +606,7 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
 
       <TabsContent value="theme" className="studio-tab-content">
         <div className="studio-theme-stack">
+          <ThemeFromImage idPrefix={idPrefix} onApply={applyThemePatch} />
           <section className="studio-theme-group" aria-labelledby={`${idPrefix}-heading-typography`}>
             <div className="studio-theme-group-heading">
               <h3 id={`${idPrefix}-heading-typography`}>Heading typography</h3>

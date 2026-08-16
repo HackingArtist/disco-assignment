@@ -63,7 +63,6 @@ export interface WidgetTheme {
 export interface OfferConfig {
   id: string;
   partnerName: string;
-  eyebrow: string;
   headline: string;
   introduction: string;
   title: string;
@@ -155,7 +154,6 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
   primaryOffer: {
     id: "morrow",
     partnerName: "Morrow",
-    eyebrow: "Unlocked with your Noma order",
     headline: "Your order unlocked a trail perk.",
     introduction: "You’ve earned $20 toward Morrow’s insulated Ridge bottle.",
     title: "Your Morrow bottle benefit",
@@ -175,7 +173,6 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     {
       id: "field-notes",
       partnerName: "Field Notes",
-      eyebrow: "Another order perk",
       headline: "Your order includes trail notes",
       introduction: "A place for routes, notes, and new ideas.",
       title: "A trail-ready extra",
@@ -194,7 +191,6 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     {
       id: "ritual",
       partnerName: "Ritual Goods",
-      eyebrow: "Another order perk",
       headline: "Your order unlocked trail comfort",
       introduction: "A 25% benefit on Ritual Goods merino running socks.",
       title: "A comfort perk for the trail",
