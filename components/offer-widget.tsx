@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import {
-  fontPresetVariables,
+  googleFontVariables,
   type AssetReference,
   type OfferConfig,
   type PreviewContext,
@@ -25,6 +25,52 @@ interface OfferWidgetProps {
 interface PreviewCanvasProps extends OfferWidgetProps {
   context: PreviewContext;
   viewport: PreviewViewport;
+}
+
+const CUSTOM_BUTTON_STATES = ["hover", "active", "focus", "focus-visible", "disabled"] as const;
+
+function sanitizeCssDeclarations(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split(";")
+    .map((declaration) => {
+      const separator = declaration.indexOf(":");
+      if (separator < 1) return "";
+      const property = declaration.slice(0, separator).trim();
+      const value = declaration.slice(separator + 1).trim();
+      const validProperty = /^(?:--[\w-]+|-?[a-z][\w-]*)$/i.test(property);
+      const unsafeValue = /[{}<>]|@import|expression\s*\(|javascript:/i.test(value);
+      return validProperty && value && !unsafeValue ? `${property}: ${value};` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function compileButtonCss(source: string, selector: string): string {
+  let baseSource = source;
+  const stateRules: string[] = [];
+
+  for (const state of CUSTOM_BUTTON_STATES) {
+    const pattern = new RegExp(`(?:&\\s*)?:${state}\\s*\\{([^{}]*)\\}`, "gi");
+    baseSource = baseSource.replace(pattern, (_match, declarations: string) => {
+      const safeDeclarations = sanitizeCssDeclarations(declarations);
+      if (safeDeclarations) stateRules.push(`${selector}:${state} {\n${safeDeclarations}\n}`);
+      return "";
+    });
+  }
+
+  const baseDeclarations = sanitizeCssDeclarations(baseSource);
+  return [baseDeclarations ? `${selector} {\n${baseDeclarations}\n}` : "", ...stateRules]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function normalizeCssSize(value: string, fallback: string): string {
+  const size = value.trim();
+  if (/^(?:0|\d*\.?\d+(?:px|rem|em|%|vw|vh|vmin|vmax|ch|ex))$/i.test(size)) return size;
+  if (/^\d*\.?\d+$/.test(size)) return `${size}px`;
+  if (/^(?:calc|clamp|min|max|var)\([^{};]+\)$/i.test(size)) return size;
+  return fallback;
 }
 
 function FallbackArtwork({ kind }: { kind: AssetReference["fallback"] }) {
@@ -80,7 +126,7 @@ function OfferDisclosure({ config, plural = false }: { config: WidgetConfigurati
   return (
     <p className="ow-disclosure">
       {plural
-        ? `Offers from ${config.merchant.name} partners, matched to your order.`
+        ? `Partner benefits unlocked by your ${config.merchant.name} order.`
         : config.disclosure}
     </p>
   );
@@ -142,47 +188,46 @@ export function OfferWidget({
   };
 
   return (
-    <aside className={`ow-widget ow-density-${config.behavior.density}`} aria-label="Offer for your order">
+    <aside className={`ow-widget ow-density-${config.behavior.density}${config.behavior.showArtwork ? "" : " ow-without-artwork"}`} aria-label="Benefit unlocked by your order">
       <div className="ow-kicker">
-        <span>From {config.merchant.name}</span>
+        <span>Order perk unlocked</span>
         <i />
-        <span>For this order</span>
+        <span>From {config.merchant.name}</span>
       </div>
 
       {state === "default" && (
         <section className="ow-panel ow-primary-offer">
           <div className="ow-offer-intro">
-            <p className="ow-eyebrow">{config.primaryOffer.eyebrow}</p>
             <h2>{config.primaryOffer.headline}</h2>
             <p>{config.primaryOffer.introduction}</p>
           </div>
-          <OfferArtwork asset={config.primaryOffer.image} />
-          <div className="ow-offer-copy">
-            <div>
-              <p className="ow-partner-name">{config.primaryOffer.partnerName}</p>
-              <h3>{config.primaryOffer.title}</h3>
-              <p className="ow-offer-detail">{config.primaryOffer.detail}</p>
-            </div>
-            {config.behavior.showExpiry && (
-              <p className="ow-expiry">{config.primaryOffer.expiry}</p>
-            )}
-          </div>
+          {config.behavior.showArtwork && <OfferArtwork asset={config.primaryOffer.image} />}
+          {config.behavior.showExpiry && (
+            <p className="ow-expiry">{config.primaryOffer.expiry}</p>
+          )}
           <div className="ow-offer-actions">
             <button className="ow-button ow-button-primary" type="button" onClick={() => claim(config.primaryOffer)}>
               {config.primaryOffer.claimLabel}
             </button>
-            <button className="ow-button ow-button-quiet" type="button" onClick={reject}>Not for me</button>
+            <button className="ow-button ow-button-quiet" type="button" onClick={reject}>No, thanks</button>
           </div>
-          <OfferDisclosure config={config} />
+          <footer className="ow-offer-footer">
+            <p className="ow-powered-by" aria-label="Powered by Disco">
+              <span>Powered by</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/disco-logo.png" alt="" />
+            </p>
+            <OfferDisclosure config={config} />
+          </footer>
         </section>
       )}
 
       {state === "loading" && (
         <section className="ow-panel ow-status-panel ow-loading-panel" aria-live="polite" aria-busy="true">
           <div className="ow-loading-mark"><span /><span /><span /></div>
-          <p className="ow-eyebrow">One moment</p>
-          <h2>Finding a better match…</h2>
-          <p>Looking at what pairs well with your order.</p>
+          <p className="ow-eyebrow">One sec</p>
+          <h2>Checking your other unlocked perks…</h2>
+          <p>These benefits come with your order.</p>
           <div className="ow-loading-lines"><i /><i /><i /></div>
         </section>
       )}
@@ -191,17 +236,17 @@ export function OfferWidget({
         <section className="ow-recovery" aria-live="polite">
           <div className="ow-recovery-heading">
             <div>
-              <p className="ow-eyebrow">Two more ideas</p>
-              <h2>Maybe one of these?</h2>
+              <p className="ow-eyebrow">Also unlocked</p>
+              <h2>Your order comes with more perks.</h2>
             </div>
             <button type="button" onClick={() => {
               moveTo("exit");
               onEvent("alternatives_rejected");
-            }}>Neither</button>
+            }}>No, thanks</button>
           </div>
           {config.alternativeOffers.map((offer) => (
             <article className="ow-alternative-card" key={offer.id}>
-              <OfferArtwork asset={offer.image} />
+              {config.behavior.showArtwork && <OfferArtwork asset={offer.image} />}
               <div className="ow-alternative-copy">
                 <p className="ow-partner-name">{offer.partnerName}</p>
                 <h3>{offer.title}</h3>
@@ -219,9 +264,9 @@ export function OfferWidget({
       {state === "claimed" && (
         <section className="ow-panel ow-status-panel ow-claimed-panel" aria-live="polite">
           <span className="ow-status-icon">✓</span>
-          <p className="ow-eyebrow">Saved for later</p>
-          <h2>Your {claimedOffer.partnerName} offer is claimed.</h2>
-          <p>We sent the details to <strong>aashish@gmail.com</strong>, so you don&apos;t need to use it now.</p>
+          <p className="ow-eyebrow">It&apos;s yours</p>
+          <h2>Your {claimedOffer.partnerName} benefit is ready.</h2>
+          <p>We added it to your order and emailed the details to <strong>aashish@gmail.com</strong>.</p>
           {config.behavior.claimMode === "coupon" && (
             <>
               <button className="ow-coupon" type="button" onClick={copyCode} aria-label={`Copy offer code ${claimedOffer.couponCode}`}>
@@ -238,9 +283,9 @@ export function OfferWidget({
       {state === "error" && (
         <section className="ow-panel ow-status-panel ow-error-panel" aria-live="polite">
           <span className="ow-status-icon">↻</span>
-          <p className="ow-eyebrow">That didn&apos;t load</p>
-          <h2>We couldn&apos;t find your offer.</h2>
-          <p>Your order is all set. You can try the offer again without affecting anything.</p>
+          <p className="ow-eyebrow">Sorry about that</p>
+          <h2>That didn&apos;t work.</h2>
+          <p>Your order is safe. Want to try again?</p>
           <button className="ow-button ow-button-primary" type="button" onClick={reject}>Try again</button>
           <button className="ow-button ow-button-quiet" type="button" onClick={() => moveTo("exit")}>No thanks</button>
         </section>
@@ -249,9 +294,9 @@ export function OfferWidget({
       {state === "empty" && (
         <section className="ow-panel ow-status-panel ow-empty-panel" aria-live="polite">
           <span className="ow-status-icon">✦</span>
-          <p className="ow-eyebrow">That&apos;s everything</p>
-          <h2>Nothing worth showing right now.</h2>
-          <p>We&apos;d rather show nothing than something that isn&apos;t a good fit. Enjoy your new runners.</p>
+          <p className="ow-eyebrow">That&apos;s all</p>
+          <h2>Nothing else for now.</h2>
+          <p>Enjoy your new runners.</p>
           <button className="ow-text-action" type="button" onClick={() => moveTo("default")}>Return to order</button>
         </section>
       )}
@@ -259,9 +304,9 @@ export function OfferWidget({
       {state === "exit" && (
         <section className="ow-panel ow-status-panel ow-exit-panel" aria-live="polite">
           <span className="ow-status-icon">✓</span>
-          <p className="ow-eyebrow">All done</p>
-          <h2>No problem. Enjoy your order.</h2>
-          <p>We&apos;ll use your feedback to make the next match more useful.</p>
+          <p className="ow-eyebrow">All good</p>
+          <h2>Enjoy your order.</h2>
+          <p>Thanks for letting us know.</p>
           <button className="ow-text-action" type="button" onClick={() => moveTo("default")}>Undo</button>
         </section>
       )}
@@ -335,7 +380,10 @@ export function PreviewCanvas({
   context,
   viewport,
 }: PreviewCanvasProps) {
-  const fonts = fontPresetVariables[config.theme.fontPreset];
+  const customButtonCss = [
+    compileButtonCss(config.theme.primaryButtonCss, ".preview-document .ow-button-primary"),
+    compileButtonCss(config.theme.secondaryButtonCss, ".preview-document .ow-button-quiet"),
+  ].filter(Boolean).join("\n");
   const style: ThemeProperties = {
     "--ow-page": config.theme.page,
     "--ow-surface": config.theme.surface,
@@ -347,8 +395,13 @@ export function PreviewCanvas({
     "--ow-accent": config.theme.accent,
     "--ow-border": config.theme.border,
     "--ow-radius": `${config.theme.radius}px`,
-    "--ow-display-font": fonts.display,
-    "--ow-body-font": fonts.body,
+    "--ow-stroke-width": `${config.theme.borderWidth}px`,
+    "--ow-display-font": googleFontVariables[config.theme.primaryFont],
+    "--ow-body-font": googleFontVariables[config.theme.secondaryFont],
+    "--ow-heading-size": normalizeCssSize(config.theme.headingFontSize, "36px"),
+    "--ow-heading-weight": String(config.theme.headingFontWeight),
+    "--ow-body-size": normalizeCssSize(config.theme.secondaryFontSize, "14px"),
+    "--ow-body-weight": String(config.theme.secondaryFontWeight),
   };
   const widget = (
     <OfferWidget
@@ -365,6 +418,7 @@ export function PreviewCanvas({
       style={style}
       data-testid="preview-document"
     >
+      {customButtonCss && <style>{customButtonCss}</style>}
       {context === "context" ? (
         <MerchantContext config={config}>{widget}</MerchantContext>
       ) : (

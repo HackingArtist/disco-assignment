@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import {
   Activity,
+  Braces,
   ImageIcon,
   LayoutPanelLeft,
   Link2,
@@ -15,7 +16,6 @@ import {
 } from "lucide-react";
 
 import { PreviewCanvas } from "@/components/offer-widget";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,14 +34,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import {
   contrastRatio,
   createDefaultWidgetConfiguration,
-  fontPresetLabels,
+  googleFontLabels,
   getUploadedAssets,
   isValidHex,
   isValidImageUrl,
   widgetStateLabels,
   type AssetReference,
-  type FontPreset,
-  type OfferConfig,
+  type GoogleFont,
   type PreviewContext,
   type PreviewViewport,
   type WidgetConfiguration,
@@ -52,7 +51,6 @@ import {
 interface FieldProps {
   id: string;
   label: string;
-  description?: string;
   count?: string;
   children: ReactNode;
 }
@@ -68,10 +66,9 @@ interface AssetFieldProps {
   label: string;
   asset: AssetReference;
   onChange: (asset: AssetReference) => void;
-  fallbackLabel: string;
 }
 
-function Field({ id, label, description, count, children }: FieldProps) {
+function Field({ id, label, count, children }: FieldProps) {
   return (
     <div className="studio-field">
       <div className="studio-field-heading">
@@ -79,16 +76,14 @@ function Field({ id, label, description, count, children }: FieldProps) {
         {count && <span className="studio-count">{count}</span>}
       </div>
       {children}
-      {description && <p className="studio-field-description">{description}</p>}
     </div>
   );
 }
 
-function SectionHeading({ title, description }: { title: string; description: string }) {
+function SectionHeading({ title }: { title: string }) {
   return (
     <div className="studio-section-heading">
       <h2>{title}</h2>
-      <p>{description}</p>
     </div>
   );
 }
@@ -130,7 +125,154 @@ function ColorField({
   );
 }
 
-function AssetField({ id, label, asset, onChange, fallbackLabel }: AssetFieldProps) {
+function formatCssDeclarations(source: string, indent = ""): string {
+  const withSeparatedComments = source.replace(/\/\*[\s\S]*?\*\//g, (comment) => `${comment};`);
+  return withSeparatedComments
+    .split(";")
+    .map((rawDeclaration) => {
+      const declaration = rawDeclaration.trim();
+      if (!declaration) return "";
+      if (declaration.startsWith("/*") && declaration.endsWith("*/")) {
+        return `${indent}${declaration}`;
+      }
+      const separator = declaration.indexOf(":");
+      if (separator < 1) return `${indent}${declaration}`;
+      const property = declaration.slice(0, separator).trim();
+      const value = declaration.slice(separator + 1).trim().replace(/\s+/g, " ");
+      return `${indent}${property}: ${value};`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatButtonCss(source: string): string {
+  if (!source.trim()) return "";
+  const statePattern = /(?:&\s*)?:(hover|active|focus-visible|focus|disabled)\s*\{([^{}]*)\}/gi;
+  const states = Array.from(source.matchAll(statePattern));
+  const base = formatCssDeclarations(source.replace(statePattern, ""));
+  const blocks = states.map((match) => {
+    const declarations = formatCssDeclarations(match[2] ?? "", "  ");
+    return `:${match[1]?.toLowerCase()} {\n${declarations}\n}`;
+  });
+  return [base, ...blocks].filter(Boolean).join("\n\n");
+}
+
+function highlightCssValue(value: string, lineIndex: number): ReactNode[] {
+  const tokenPattern = /(#[\da-f]{3,8}\b|(?:rgba?|hsla?|var|calc|clamp|min|max|linear-gradient|radial-gradient|color-mix|brightness|saturate|blur)\([^;]*?\)|-?\d*\.?\d+(?:px|rem|em|%|ms|s|deg)?\b|\b(?:transparent|currentColor|none|solid|dashed|ease|ease-in|ease-out|uppercase|lowercase|pointer|not-allowed)\b)/gi;
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  let tokenIndex = 0;
+
+  for (const match of value.matchAll(tokenPattern)) {
+    const index = match.index ?? 0;
+    if (index > cursor) parts.push(value.slice(cursor, index));
+    const token = match[0];
+    const className = token.startsWith("#") || /^(?:rgb|hsl)/i.test(token)
+      ? "studio-token-color"
+      : /^-?\d/.test(token)
+        ? "studio-token-number"
+        : token.includes("(")
+          ? "studio-token-function"
+          : "studio-token-keyword";
+    parts.push(<span className={className} key={`${lineIndex}-${tokenIndex}`}>{token}</span>);
+    cursor = index + token.length;
+    tokenIndex += 1;
+  }
+  if (cursor < value.length) parts.push(value.slice(cursor));
+  return parts;
+}
+
+function highlightCss(source: string): ReactNode[] {
+  return source.split("\n").map((line, lineIndex) => {
+    const trimmed = line.trim();
+    const indentation = line.match(/^\s*/)?.[0] ?? "";
+    const declaration = /^(\s*)(--?[\w-]+)(\s*:\s*)(.*?)(;?)$/.exec(line);
+    const selector = /^(\s*)(:[\w-]+)(\s*)(\{)$/.exec(line);
+
+    let content: ReactNode = line;
+    if (trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+      content = <span className="studio-token-comment">{line}</span>;
+    } else if (selector) {
+      content = <>{selector[1]}<span className="studio-token-selector">{selector[2]}</span>{selector[3]}<span className="studio-token-punctuation">{selector[4]}</span></>;
+    } else if (trimmed === "}") {
+      content = <>{indentation}<span className="studio-token-punctuation">{"}"}</span></>;
+    } else if (declaration) {
+      content = <>{declaration[1]}<span className={declaration[2]?.startsWith("--") ? "studio-token-variable" : "studio-token-property"}>{declaration[2]}</span><span className="studio-token-punctuation">{declaration[3]}</span><span className="studio-token-value">{highlightCssValue(declaration[4] ?? "", lineIndex)}</span><span className="studio-token-punctuation">{declaration[5]}</span></>;
+    }
+    return <span key={lineIndex}>{content}{"\n"}</span>;
+  });
+}
+
+function CssEditor({
+  id,
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  const highlightRef = useRef<HTMLPreElement>(null);
+  const format = () => {
+    const formatted = formatButtonCss(value);
+    if (formatted !== value) onChange(formatted);
+  };
+  const lineCount = value ? value.split(/\r?\n/).length : 1;
+
+  return (
+    <Field id={id} label={label}>
+      <div className="studio-code-editor">
+        <div className="studio-code-toolbar">
+          <div className="studio-code-language">
+            <span className="studio-code-dots" aria-hidden="true"><i /><i /><i /></span>
+            <Braces aria-hidden="true" />
+            <span>CSS</span>
+            <small>{lineCount} {lineCount === 1 ? "line" : "lines"}</small>
+          </div>
+          <Button type="button" variant="ghost" size="sm" className="studio-code-format" onClick={format}>
+            Format
+          </Button>
+        </div>
+        <div className="studio-code-body">
+          <pre ref={highlightRef} className="studio-code-highlight" aria-hidden="true">{highlightCss(value)}</pre>
+          <Textarea
+            id={id}
+            className="studio-css-input"
+            value={value}
+            rows={9}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            placeholder={placeholder}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={format}
+            onScroll={(event) => {
+              if (!highlightRef.current) return;
+              highlightRef.current.scrollTop = event.currentTarget.scrollTop;
+              highlightRef.current.scrollLeft = event.currentTarget.scrollLeft;
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Tab") return;
+              event.preventDefault();
+              const textarea = event.currentTarget;
+              const start = textarea.selectionStart;
+              const end = textarea.selectionEnd;
+              const nextValue = `${value.slice(0, start)}  ${value.slice(end)}`;
+              onChange(nextValue);
+              window.requestAnimationFrame(() => textarea.setSelectionRange(start + 2, start + 2));
+            }}
+          />
+        </div>
+      </div>
+    </Field>
+  );
+}
+
+function AssetField({ id, label, asset, onChange }: AssetFieldProps) {
   const [error, setError] = useState("");
   const validUrl = isValidImageUrl(asset.kind === "url" ? asset.src : "");
 
@@ -166,7 +308,6 @@ function AssetField({ id, label, asset, onChange, fallbackLabel }: AssetFieldPro
     <div className="studio-asset-field">
       <div className="studio-field-heading">
         <Label>{label}</Label>
-        <Badge variant="outline">{asset.kind === "fallback" ? fallbackLabel : asset.kind}</Badge>
       </div>
       <div className="asset-actions">
         <label className="asset-upload-button" htmlFor={`${id}-upload`}>
@@ -216,7 +357,7 @@ function AssetField({ id, label, asset, onChange, fallbackLabel }: AssetFieldPro
       </div>
       {!validUrl && <p className="studio-error">Use a complete http:// or https:// image URL.</p>}
       {error && <p className="studio-error">{error}</p>}
-      <Field id={`${id}-alt`} label="Image description" description="Used when the image carries useful product information.">
+      <Field id={`${id}-alt`} label="Image description">
         <Input
           id={`${id}-alt`}
           value={asset.alt}
@@ -228,83 +369,14 @@ function AssetField({ id, label, asset, onChange, fallbackLabel }: AssetFieldPro
   );
 }
 
-function OfferEditor({
-  offer,
-  onChange,
-  idPrefix,
-}: {
-  offer: OfferConfig;
-  onChange: (offer: OfferConfig) => void;
-  idPrefix: string;
-}) {
-  const update = <Key extends keyof OfferConfig>(key: Key, value: OfferConfig[Key]) => {
-    onChange({ ...offer, [key]: value });
-  };
-  const textField = (
-    key: Exclude<keyof OfferConfig, "id" | "image">,
-    label: string,
-    maxLength: number,
-    multiline = false,
-  ) => {
-    const id = `${idPrefix}-${key}`;
-    const value = offer[key];
-    return (
-      <Field id={id} label={label} count={`${value.length}/${maxLength}`}>
-        {multiline ? (
-          <Textarea
-            id={id}
-            value={value}
-            maxLength={maxLength}
-            rows={2}
-            onChange={(event) => update(key, event.target.value)}
-          />
-        ) : (
-          <Input
-            id={id}
-            value={value}
-            maxLength={maxLength}
-            onChange={(event) => update(key, event.target.value)}
-          />
-        )}
-      </Field>
-    );
-  };
-
-  return (
-    <div className="studio-field-stack">
-      <AssetField
-        id={`${idPrefix}-image`}
-        label="Offer image"
-        asset={offer.image}
-        fallbackLabel={offer.image.fallback}
-        onChange={(image) => update("image", image)}
-      />
-      {textField("partnerName", "Partner name", 40)}
-      {textField("eyebrow", "Eyebrow", 56)}
-      {textField("headline", "Headline", 80, true)}
-      {textField("introduction", "Introduction", 120, true)}
-      {textField("title", "Offer title", 72, true)}
-      {textField("detail", "Offer detail", 96, true)}
-      {textField("expiry", "Expiry message", 56)}
-      {textField("claimLabel", "Claim button", 32)}
-      <div className="studio-field-grid">
-        {textField("couponCode", "Coupon code", 24)}
-        {textField("destinationLabel", "Shop button", 36)}
-      </div>
-    </div>
-  );
-}
-
 function SwitchRow({
   id,
   label,
-  description,
   checked,
   onCheckedChange,
 }: {
   id: string;
   label: string;
-  description: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }) {
@@ -312,7 +384,6 @@ function SwitchRow({
     <div className="studio-switch-row">
       <div>
         <Label htmlFor={id}>{label}</Label>
-        <p>{description}</p>
       </div>
       <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
@@ -341,72 +412,142 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
     ...current,
     behavior: { ...current.behavior, [key]: value },
   }));
-  const updateAlternative = (index: 0 | 1, offer: OfferConfig) => {
-    setConfig((current) => {
-      const alternatives: [OfferConfig, OfferConfig] = [...current.alternativeOffers];
-      alternatives[index] = offer;
-      return { ...current, alternativeOffers: alternatives };
-    });
-  };
   const textContrast = contrastRatio(config.theme.text, config.theme.surface);
   const buttonContrast = contrastRatio(config.theme.primaryText, config.theme.primary);
 
   return (
-    <Tabs defaultValue="brand" className="studio-config-tabs">
+    <Tabs defaultValue="info" className="studio-config-tabs">
+      <div className="studio-panel-header">
+        <div>
+          <h1>Offer widget</h1>
+        </div>
+      </div>
       <TabsList className="studio-tabs-list">
-        <TabsTrigger value="brand">Brand</TabsTrigger>
-        <TabsTrigger value="offers">Offers</TabsTrigger>
+        <TabsTrigger value="info">Info</TabsTrigger>
+        <TabsTrigger value="theme">Theme</TabsTrigger>
         <TabsTrigger value="behavior">Behavior</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="brand" className="studio-tab-content">
-        <SectionHeading title="Merchant identity" description="Apply the host brand to the confirmation page and widget frame." />
+      <TabsContent value="info" className="studio-tab-content">
+        <SectionHeading title="Merchant identity" />
         <div className="studio-field-stack">
           <AssetField
             id={`${idPrefix}-merchant-logo`}
             label="Merchant logo"
             asset={config.merchant.logo}
-            fallbackLabel="Wordmark"
             onChange={(logo) => updateMerchant("logo", logo)}
           />
-          <Field id={`${idPrefix}-merchant-name`} label="Merchant name" count={`${config.merchant.name.length}/32`}>
-            <Input
-              id={`${idPrefix}-merchant-name`}
-              value={config.merchant.name}
-              maxLength={32}
-              onChange={(event) => updateMerchant("name", event.target.value)}
-            />
-          </Field>
-          <Field id={`${idPrefix}-wordmark`} label="Wordmark" count={`${config.merchant.wordmark.length}/18`}>
-            <Input
-              id={`${idPrefix}-wordmark`}
-              value={config.merchant.wordmark}
-              maxLength={18}
-              onChange={(event) => updateMerchant("wordmark", event.target.value)}
-            />
-          </Field>
-          <Field id={`${idPrefix}-contact-email`} label="Contact email">
-            <Input
-              id={`${idPrefix}-contact-email`}
-              type="email"
-              value={config.merchant.contactEmail}
-              onChange={(event) => updateMerchant("contactEmail", event.target.value)}
-            />
+          <Field id={`${idPrefix}-density`} label="Default density">
+            <Select value={config.behavior.density} onValueChange={(value) => updateBehavior("density", value as WidgetConfiguration["behavior"]["density"])}>
+              <SelectTrigger id={`${idPrefix}-density`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="compact">Space-aware</SelectItem>
+                <SelectItem value="roomy">Roomy</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
         </div>
+      </TabsContent>
 
-        <Separator />
-        <SectionHeading title="Theme" description="These tokens stay scoped to the preview and never recolor the studio." />
-        <div className="studio-color-grid">
-          <ColorField id={`${idPrefix}-page`} label="Page" value={config.theme.page} onChange={(value) => updateTheme("page", value)} />
-          <ColorField id={`${idPrefix}-surface`} label="Surface" value={config.theme.surface} onChange={(value) => updateTheme("surface", value)} />
-          <ColorField id={`${idPrefix}-soft-surface`} label="Soft surface" value={config.theme.softSurface} onChange={(value) => updateTheme("softSurface", value)} />
-          <ColorField id={`${idPrefix}-text`} label="Text" value={config.theme.text} onChange={(value) => updateTheme("text", value)} />
-          <ColorField id={`${idPrefix}-muted-text`} label="Muted text" value={config.theme.mutedText} onChange={(value) => updateTheme("mutedText", value)} />
-          <ColorField id={`${idPrefix}-primary`} label="Primary" value={config.theme.primary} onChange={(value) => updateTheme("primary", value)} />
-          <ColorField id={`${idPrefix}-primary-text`} label="Button text" value={config.theme.primaryText} onChange={(value) => updateTheme("primaryText", value)} />
-          <ColorField id={`${idPrefix}-accent`} label="Accent" value={config.theme.accent} onChange={(value) => updateTheme("accent", value)} />
-          <ColorField id={`${idPrefix}-border`} label="Border" value={config.theme.border} onChange={(value) => updateTheme("border", value)} />
+      <TabsContent value="theme" className="studio-tab-content">
+        <div className="studio-theme-stack">
+          <section className="studio-theme-group" aria-labelledby={`${idPrefix}-heading-typography`}>
+            <div className="studio-theme-group-heading">
+              <h3 id={`${idPrefix}-heading-typography`}>Heading typography</h3>
+            </div>
+            <div className="studio-theme-grid">
+              <ColorField id={`${idPrefix}-text`} label="Heading Text" value={config.theme.text} onChange={(value) => updateTheme("text", value)} />
+              <Field id={`${idPrefix}-primary-font`} label="Primary Font">
+                <Select value={config.theme.primaryFont} onValueChange={(value) => updateTheme("primaryFont", value as GoogleFont)}>
+                  <SelectTrigger id={`${idPrefix}-primary-font`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(googleFontLabels) as [GoogleFont, string][]).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field id={`${idPrefix}-heading-size`} label="Font size">
+                <Input
+                  id={`${idPrefix}-heading-size`}
+                  list={`${idPrefix}-heading-size-options`}
+                  className="studio-size-combobox"
+                  value={config.theme.headingFontSize}
+                  placeholder="36px"
+                  onChange={(event) => updateTheme("headingFontSize", event.target.value)}
+                />
+                <datalist id={`${idPrefix}-heading-size-options`}>
+                  {["24px", "28px", "32px", "36px", "40px", "48px", "56px", "2.25rem"].map((size) => <option key={size} value={size} />)}
+                </datalist>
+              </Field>
+              <Field id={`${idPrefix}-heading-weight`} label="Font weight">
+                <Select value={String(config.theme.headingFontWeight)} onValueChange={(value) => updateTheme("headingFontWeight", Number(value))}>
+                  <SelectTrigger id={`${idPrefix}-heading-weight`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[400, 500, 600, 700].map((weight) => <SelectItem key={weight} value={String(weight)}>{weight}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          </section>
+
+          <section className="studio-theme-group" aria-labelledby={`${idPrefix}-secondary-typography`}>
+            <div className="studio-theme-group-heading">
+              <h3 id={`${idPrefix}-secondary-typography`}>Secondary typography</h3>
+            </div>
+            <div className="studio-theme-grid">
+              <ColorField id={`${idPrefix}-muted-text`} label="Secondary Text" value={config.theme.mutedText} onChange={(value) => updateTheme("mutedText", value)} />
+              <Field id={`${idPrefix}-secondary-font`} label="Secondary Font">
+                <Select value={config.theme.secondaryFont} onValueChange={(value) => updateTheme("secondaryFont", value as GoogleFont)}>
+                  <SelectTrigger id={`${idPrefix}-secondary-font`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(googleFontLabels) as [GoogleFont, string][]).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field id={`${idPrefix}-secondary-size`} label="Font size">
+                <Input
+                  id={`${idPrefix}-secondary-size`}
+                  list={`${idPrefix}-secondary-size-options`}
+                  className="studio-size-combobox"
+                  value={config.theme.secondaryFontSize}
+                  placeholder="14px"
+                  onChange={(event) => updateTheme("secondaryFontSize", event.target.value)}
+                />
+                <datalist id={`${idPrefix}-secondary-size-options`}>
+                  {["8px", "9px", "10px", "11px", "12px", "14px", "16px", "1rem"].map((size) => <option key={size} value={size} />)}
+                </datalist>
+              </Field>
+              <Field id={`${idPrefix}-secondary-weight`} label="Font weight">
+                <Select value={String(config.theme.secondaryFontWeight)} onValueChange={(value) => updateTheme("secondaryFontWeight", Number(value))}>
+                  <SelectTrigger id={`${idPrefix}-secondary-weight`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[300, 400, 500, 600, 700].map((weight) => <SelectItem key={weight} value={String(weight)}>{weight}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          </section>
+
+          <section className="studio-theme-group" aria-labelledby={`${idPrefix}-surfaces`}>
+            <div className="studio-theme-group-heading">
+              <h3 id={`${idPrefix}-surfaces`}>Surfaces</h3>
+            </div>
+            <div className="studio-theme-grid">
+              <ColorField id={`${idPrefix}-surface`} label="Background" value={config.theme.surface} onChange={(value) => updateTheme("surface", value)} />
+              <ColorField id={`${idPrefix}-border`} label="Border" value={config.theme.border} onChange={(value) => updateTheme("border", value)} />
+              <ColorField id={`${idPrefix}-primary`} label="Primary Button" value={config.theme.primary} onChange={(value) => updateTheme("primary", value)} />
+              <ColorField id={`${idPrefix}-soft-surface`} label="Secondary Button" value={config.theme.softSurface} onChange={(value) => updateTheme("softSurface", value)} />
+              <Field id={`${idPrefix}-radius`} label="Corner radius" count={`${config.theme.radius}px`}>
+                <Slider id={`${idPrefix}-radius`} min={0} max={20} step={2} value={[config.theme.radius]} onValueChange={(value) => updateTheme("radius", Array.isArray(value) ? (value[0] ?? 0) : value)} />
+              </Field>
+              <Field id={`${idPrefix}-stroke-width`} label="Stroke" count={`${config.theme.borderWidth}px`}>
+                <Slider id={`${idPrefix}-stroke-width`} min={0} max={4} step={1} value={[config.theme.borderWidth]} onValueChange={(value) => updateTheme("borderWidth", Array.isArray(value) ? (value[0] ?? 1) : value)} />
+              </Field>
+            </div>
+          </section>
         </div>
         {(textContrast < 4.5 || buttonContrast < 4.5) && (
           <Alert variant="destructive" className="studio-contrast-alert">
@@ -418,83 +559,29 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
             </AlertDescription>
           </Alert>
         )}
-        <Field id={`${idPrefix}-font`} label="Font pairing">
-          <Select value={config.theme.fontPreset} onValueChange={(value) => updateTheme("fontPreset", value as FontPreset)}>
-            <SelectTrigger id={`${idPrefix}-font`} className="studio-select-trigger">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.entries(fontPresetLabels) as [FontPreset, string][]).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field id={`${idPrefix}-radius`} label="Corner radius" count={`${config.theme.radius}px`} description="Applies to cards, buttons, and image surfaces.">
-          <Slider
-            id={`${idPrefix}-radius`}
-            min={0}
-            max={20}
-            step={2}
-            value={[config.theme.radius]}
-            onValueChange={(value) => updateTheme("radius", Array.isArray(value) ? (value[0] ?? 0) : value)}
+        <Separator />
+        <SectionHeading title="Custom button CSS" />
+        <div className="studio-field-stack">
+          <CssEditor
+            id={`${idPrefix}-primary-button-css`}
+            label="Primary button CSS"
+            value={config.theme.primaryButtonCss}
+            placeholder={`--button-bg: #253a2a;\nbackground: var(--button-bg);\nborder-radius: 12px;\n:hover {\n  filter: brightness(.9);\n}`}
+            onChange={(value) => updateTheme("primaryButtonCss", value)}
           />
-        </Field>
-      </TabsContent>
-
-      <TabsContent value="offers" className="studio-tab-content">
-        <SectionHeading title="Offer content" description="Edit the best match and both recovery alternatives." />
-        <Accordion multiple defaultValue={["primary"]} className="studio-offer-accordion">
-          <AccordionItem value="primary">
-            <AccordionTrigger>
-              <span><strong>Primary offer</strong><small>{config.primaryOffer.partnerName}</small></span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <OfferEditor
-                offer={config.primaryOffer}
-                idPrefix={`${idPrefix}-primary`}
-                onChange={(primaryOffer) => setConfig((current) => ({ ...current, primaryOffer }))}
-              />
-            </AccordionContent>
-          </AccordionItem>
-          {config.alternativeOffers.map((offer, index) => (
-            <AccordionItem value={`alternative-${index}`} key={offer.id}>
-              <AccordionTrigger>
-                <span><strong>Alternative {index + 1}</strong><small>{offer.partnerName}</small></span>
-              </AccordionTrigger>
-              <AccordionContent>
-                <OfferEditor
-                  offer={offer}
-                  idPrefix={`${idPrefix}-alternative-${index}`}
-                  onChange={(nextOffer) => updateAlternative(index as 0 | 1, nextOffer)}
-                />
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-        <Field id={`${idPrefix}-disclosure`} label="Partner disclosure" count={`${config.disclosure.length}/100`}>
-          <Textarea
-            id={`${idPrefix}-disclosure`}
-            rows={2}
-            value={config.disclosure}
-            maxLength={100}
-            onChange={(event) => setConfig((current) => ({ ...current, disclosure: event.target.value }))}
+          <CssEditor
+            id={`${idPrefix}-secondary-button-css`}
+            label="Secondary button CSS"
+            value={config.theme.secondaryButtonCss}
+            placeholder={`background: transparent;\nborder: 1px solid currentColor;\n:hover {\n  background: rgba(0, 0, 0, .06);\n}`}
+            onChange={(value) => updateTheme("secondaryButtonCss", value)}
           />
-        </Field>
+        </div>
       </TabsContent>
 
       <TabsContent value="behavior" className="studio-tab-content">
-        <SectionHeading title="Widget behavior" description="Choose how the offer fits, recovers, and hands customers off." />
+        <SectionHeading title="Widget behavior" />
         <div className="studio-field-stack">
-          <Field id={`${idPrefix}-density`} label="Default density" description="Compact is designed for constrained confirmation-page placements.">
-            <Select value={config.behavior.density} onValueChange={(value) => updateBehavior("density", value as WidgetConfiguration["behavior"]["density"])}>
-              <SelectTrigger id={`${idPrefix}-density`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="compact">Space-aware</SelectItem>
-                <SelectItem value="roomy">Roomy</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
           <Field id={`${idPrefix}-rejection`} label="After rejection">
             <Select value={config.behavior.rejectionFlow} onValueChange={(value) => updateBehavior("rejectionFlow", value as WidgetConfiguration["behavior"]["rejectionFlow"])}>
               <SelectTrigger id={`${idPrefix}-rejection`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
@@ -515,16 +602,20 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
           </Field>
           <Separator />
           <SwitchRow
+            id={`${idPrefix}-show-artwork`}
+            label="Show offer images"
+            checked={config.behavior.showArtwork}
+            onCheckedChange={(checked) => updateBehavior("showArtwork", checked)}
+          />
+          <SwitchRow
             id={`${idPrefix}-show-expiry`}
             label="Show expiry"
-            description="Keep urgency visible on the primary offer."
             checked={config.behavior.showExpiry}
             onCheckedChange={(checked) => updateBehavior("showExpiry", checked)}
           />
           <SwitchRow
             id={`${idPrefix}-show-disclosure`}
             label="Show disclosure"
-            description="Identify offers as coming from merchant partners."
             checked={config.behavior.showDisclosure}
             onCheckedChange={(checked) => updateBehavior("showDisclosure", checked)}
           />
@@ -569,7 +660,7 @@ function PreviewSelect({
 export default function Configurator() {
   const [config, setConfig] = useState<WidgetConfiguration>(() => createDefaultWidgetConfiguration());
   const [previewState, setPreviewState] = useState<WidgetState>("default");
-  const [previewContext, setPreviewContext] = useState<PreviewContext>("context");
+  const [previewContext, setPreviewContext] = useState<PreviewContext>("isolated");
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>("desktop");
   const [events, setEvents] = useState<WidgetEvent[]>(["widget_viewed"]);
   const stateOptions = useMemo(
@@ -596,7 +687,7 @@ export default function Configurator() {
     getUploadedAssets(config).forEach((asset) => URL.revokeObjectURL(asset.src));
     setConfig(createDefaultWidgetConfiguration());
     setPreviewState("default");
-    setPreviewContext("context");
+    setPreviewContext("isolated");
     setPreviewViewport("desktop");
     setEvents(["widget_viewed"]);
   };
@@ -707,7 +798,7 @@ export default function Configurator() {
           </div>
 
           <div className="preview-stage">
-            <Card className={`preview-frame preview-frame-${previewViewport}`}>
+            <Card className={`preview-frame preview-frame-${previewViewport} preview-frame-${previewContext}`}>
               <CardContent className="preview-frame-content">
                 <PreviewCanvas
                   config={config}

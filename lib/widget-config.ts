@@ -10,7 +10,7 @@ export type WidgetState =
 export type WidgetDensity = "compact" | "roomy";
 export type PreviewContext = "context" | "isolated";
 export type PreviewViewport = "desktop" | "mobile";
-export type FontPreset = "editorial" | "serif" | "modern";
+export type GoogleFont = "cormorant-garamond" | "dm-sans" | "fraunces" | "space-grotesk";
 export type ArtworkKind = "bottle" | "journal" | "socks";
 
 export type WidgetEvent =
@@ -48,7 +48,15 @@ export interface WidgetTheme {
   accent: string;
   border: string;
   radius: number;
-  fontPreset: FontPreset;
+  borderWidth: number;
+  primaryFont: GoogleFont;
+  secondaryFont: GoogleFont;
+  headingFontSize: string;
+  headingFontWeight: number;
+  secondaryFontSize: string;
+  secondaryFontWeight: number;
+  primaryButtonCss: string;
+  secondaryButtonCss: string;
 }
 
 export interface OfferConfig {
@@ -70,6 +78,7 @@ export interface WidgetBehavior {
   density: WidgetDensity;
   rejectionFlow: "alternatives" | "dismiss";
   claimMode: "coupon" | "email";
+  showArtwork: boolean;
   showExpiry: boolean;
   showDisclosure: boolean;
 }
@@ -93,28 +102,18 @@ export const widgetStateLabels: Record<WidgetState, string> = {
   exit: "Dismissed",
 };
 
-export const fontPresetLabels: Record<FontPreset, string> = {
-  editorial: "Editorial",
-  serif: "Contemporary serif",
-  modern: "Modern sans",
+export const googleFontLabels: Record<GoogleFont, string> = {
+  "cormorant-garamond": "Cormorant Garamond",
+  "dm-sans": "DM Sans",
+  fraunces: "Fraunces",
+  "space-grotesk": "Space Grotesk",
 };
 
-export const fontPresetVariables: Record<
-  FontPreset,
-  { display: string; body: string }
-> = {
-  editorial: {
-    display: "var(--font-cormorant)",
-    body: "var(--font-dm-sans)",
-  },
-  serif: {
-    display: "var(--font-fraunces)",
-    body: "var(--font-dm-sans)",
-  },
-  modern: {
-    display: "var(--font-space-grotesk)",
-    body: "var(--font-space-grotesk)",
-  },
+export const googleFontVariables: Record<GoogleFont, string> = {
+  "cormorant-garamond": "var(--font-cormorant)",
+  "dm-sans": "var(--font-dm-sans)",
+  fraunces: "var(--font-fraunces)",
+  "space-grotesk": "var(--font-space-grotesk)",
 };
 
 export const defaultWidgetConfiguration: WidgetConfiguration = {
@@ -140,18 +139,26 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     accent: "#d39c72",
     border: "#d8d3c9",
     radius: 0,
-    fontPreset: "editorial",
+    borderWidth: 1,
+    primaryFont: "cormorant-garamond",
+    secondaryFont: "dm-sans",
+    headingFontSize: "36px",
+    headingFontWeight: 600,
+    secondaryFontSize: "14px",
+    secondaryFontWeight: 400,
+    primaryButtonCss: "",
+    secondaryButtonCss: "",
   },
   primaryOffer: {
     id: "morrow",
     partnerName: "Morrow",
-    eyebrow: "A little something for your order",
-    headline: "Because you chose the trail runner.",
-    introduction: "Meet the bottle built for the miles ahead.",
-    title: "$20 off the Ridge bottle",
-    detail: "Insulated stainless steel · 24 oz",
-    expiry: "Yours for the next 24 hours",
-    claimLabel: "Claim $20 off",
+    eyebrow: "Unlocked with your Noma order",
+    headline: "Your order unlocked a trail perk.",
+    introduction: "You’ve earned $20 toward Morrow’s insulated Ridge bottle.",
+    title: "Your Morrow bottle benefit",
+    detail: "$20 toward the insulated Ridge bottle · 24 oz",
+    expiry: "Your perk is available for the next 24 hours",
+    claimLabel: "Use my benefit",
     couponCode: "NOMA20",
     destinationLabel: "Shop Morrow",
     image: {
@@ -165,13 +172,13 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     {
       id: "field-notes",
       partnerName: "Field Notes",
-      eyebrow: "Alternative offer",
-      headline: "A trail journal, on us",
-      introduction: "A useful place for routes, notes, and new ideas.",
-      title: "A trail journal, on us",
-      detail: "Free 3-pack with your first order.",
-      expiry: "Available for 24 hours",
-      claimLabel: "Claim free set",
+      eyebrow: "Another order perk",
+      headline: "Your order includes trail notes",
+      introduction: "A place for routes, notes, and new ideas.",
+      title: "A trail-ready extra",
+      detail: "Your order unlocks a complimentary 3-pack.",
+      expiry: "Your perk is available for 24 hours",
+      claimLabel: "Choose this benefit",
       couponCode: "TRAILSET",
       destinationLabel: "Shop Field Notes",
       image: {
@@ -184,13 +191,13 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     {
       id: "ritual",
       partnerName: "Ritual Goods",
-      eyebrow: "Alternative offer",
-      headline: "25% off performance socks",
-      introduction: "Built for long days and longer trails.",
-      title: "25% off performance socks",
-      detail: "Merino comfort for longer runs.",
-      expiry: "Available for 24 hours",
-      claimLabel: "Claim 25% off",
+      eyebrow: "Another order perk",
+      headline: "Your order unlocked trail comfort",
+      introduction: "A 25% benefit on Ritual Goods merino running socks.",
+      title: "A comfort perk for the trail",
+      detail: "Your order unlocks 25% on soft merino running socks.",
+      expiry: "Your perk is available for 24 hours",
+      claimLabel: "Choose this benefit",
       couponCode: "RITUAL25",
       destinationLabel: "Shop Ritual Goods",
       image: {
@@ -205,10 +212,11 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     density: "compact",
     rejectionFlow: "alternatives",
     claimMode: "coupon",
+    showArtwork: true,
     showExpiry: true,
     showDisclosure: true,
   },
-  disclosure: "Offer from a Noma partner, matched to your order.",
+  disclosure: "A partner benefit unlocked by your Noma order.",
 };
 
 export function createDefaultWidgetConfiguration(): WidgetConfiguration {

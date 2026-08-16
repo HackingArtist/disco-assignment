@@ -25,9 +25,13 @@ test("server-renders the configuration studio and default widget", async () => {
   assert.match(html, /Unsaved session/);
   assert.match(html, /aria-disabled="true"[^>]*>.*Integrate/s);
   assert.match(html, /Live preview/);
-  assert.match(html, /Because you chose the trail runner\./);
+  assert.match(html, /Your order unlocked a trail perk\./);
+  assert.match(html, /Powered by Disco/);
+  assert.match(html, /src="\/disco-logo\.png"/);
   assert.match(html, /Morrow/);
-  assert.match(html, /Claim \$20 off/);
+  assert.match(html, /You’ve earned \$20 toward/);
+  assert.match(html, /Use my benefit/);
+  assert.doesNotMatch(html, /\$20 off/);
   assert.match(html, /Latest event/);
   assert.doesNotMatch(html, /class="demo-controller"/);
 });

@@ -6,13 +6,14 @@ import {
   Fraunces,
   Space_Grotesk,
 } from "next/font/google";
+import { AgentationToolbar } from "@/components/agentation-toolbar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 const display = Cormorant_Garamond({
   variable: "--font-cormorant",
   subsets: ["latin"],
-  weight: ["500", "600"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const sans = DM_Sans({
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className={`${display.variable} ${sans.variable} ${fraunces.variable} ${spaceGrotesk.variable}`}>
       <body>
         <TooltipProvider>{children}</TooltipProvider>
+        <AgentationToolbar />
       </body>
     </html>
   );
