@@ -48,6 +48,14 @@ test("keeps configuration session-only and covers every widget state", async () 
   assert.match(configurator, /createDefaultWidgetConfiguration/);
   assert.match(configurator, /getUploadedAssets\(config\)/);
   assert.match(configurator, /URL\.revokeObjectURL/);
+  assert.match(configurator, /useState<PreviewState>\("all"\)/);
+  assert.match(widget, /preview-state-canvas/);
+  assert.match(widget, /<OfferLogo asset=\{offer\.image\}/);
+  assert.match(widget, /Choose one perk to claim\./);
+  assert.match(widget, /ow-button-primary ow-alternative-action/);
+  assert.match(widget, /ow-alternative-divider/);
+  assert.doesNotMatch(widget, /ow-partner-name|Also unlocked/);
+  assert.doesNotMatch(widget, /Choose this benefit/);
   assert.doesNotMatch(configurator, /localStorage|sessionStorage/);
   assert.doesNotMatch(widget, /localStorage|sessionStorage/);
 

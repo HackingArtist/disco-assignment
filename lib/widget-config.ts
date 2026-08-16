@@ -7,8 +7,9 @@ export type WidgetState =
   | "empty"
   | "exit";
 
+export type PreviewState = WidgetState | "all";
+
 export type WidgetDensity = "compact" | "roomy";
-export type PreviewContext = "context" | "isolated";
 export type PreviewViewport = "desktop" | "mobile";
 export type GoogleFont = "cormorant-garamond" | "dm-sans" | "fraunces" | "space-grotesk";
 export type ArtworkKind = "bottle" | "journal" | "socks";
@@ -20,7 +21,7 @@ export type WidgetEvent =
   | `offer_claimed:${string}`
   | "alternatives_rejected"
   | "code_copied"
-  | `demo_state:${WidgetState}`;
+  | `demo_state:${PreviewState}`;
 
 export interface AssetReference {
   kind: "fallback" | "url" | "upload";
@@ -102,6 +103,8 @@ export const widgetStateLabels: Record<WidgetState, string> = {
   exit: "Dismissed",
 };
 
+export const widgetStates = Object.keys(widgetStateLabels) as WidgetState[];
+
 export const googleFontLabels: Record<GoogleFont, string> = {
   "cormorant-garamond": "Cormorant Garamond",
   "dm-sans": "DM Sans",
@@ -139,7 +142,7 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     accent: "#d39c72",
     border: "#d8d3c9",
     radius: 0,
-    borderWidth: 1,
+    borderWidth: 0,
     primaryFont: "cormorant-garamond",
     secondaryFont: "dm-sans",
     headingFontSize: "36px",

@@ -41,8 +41,8 @@ import {
   widgetStateLabels,
   type AssetReference,
   type GoogleFont,
-  type PreviewContext,
   type PreviewViewport,
+  type PreviewState,
   type WidgetConfiguration,
   type WidgetEvent,
   type WidgetState,
@@ -646,7 +646,11 @@ function PreviewSelect({
       <Select value={value} onValueChange={(nextValue) => {
         if (nextValue !== null) onValueChange(nextValue);
       }}>
-        <SelectTrigger className="preview-select-trigger"><SelectValue /></SelectTrigger>
+        <SelectTrigger className="preview-select-trigger">
+          <SelectValue>
+            {(selectedValue) => options.find((option) => option.value === selectedValue)?.label ?? selectedValue}
+          </SelectValue>
+        </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -659,12 +663,14 @@ function PreviewSelect({
 
 export default function Configurator() {
   const [config, setConfig] = useState<WidgetConfiguration>(() => createDefaultWidgetConfiguration());
-  const [previewState, setPreviewState] = useState<WidgetState>("default");
-  const [previewContext, setPreviewContext] = useState<PreviewContext>("isolated");
+  const [previewState, setPreviewState] = useState<PreviewState>("all");
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>("desktop");
   const [events, setEvents] = useState<WidgetEvent[]>(["widget_viewed"]);
   const stateOptions = useMemo(
-    () => (Object.entries(widgetStateLabels) as [WidgetState, string][]).map(([value, label]) => ({ value, label })),
+    () => [
+      { value: "all", label: "All states" },
+      ...(Object.entries(widgetStateLabels) as [WidgetState, string][]).map(([value, label]) => ({ value, label })),
+    ],
     [],
   );
 
@@ -678,7 +684,7 @@ export default function Configurator() {
     setEvents((current) => [event, ...current].slice(0, 4));
   };
 
-  const choosePreviewState = (state: WidgetState) => {
+  const choosePreviewState = (state: PreviewState) => {
     setPreviewState(state);
     track(`demo_state:${state}`);
   };
@@ -686,8 +692,7 @@ export default function Configurator() {
   const reset = () => {
     getUploadedAssets(config).forEach((asset) => URL.revokeObjectURL(asset.src));
     setConfig(createDefaultWidgetConfiguration());
-    setPreviewState("default");
-    setPreviewContext("isolated");
+    setPreviewState("all");
     setPreviewViewport("desktop");
     setEvents(["widget_viewed"]);
   };
@@ -754,24 +759,6 @@ export default function Configurator() {
                 <span className="preview-live-dot" />
                 <strong>Live preview</strong>
               </div>
-              <div className="preview-context-toggle" aria-label="Preview context">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={previewContext === "context" ? "secondary" : "ghost"}
-                  onClick={() => setPreviewContext("context")}
-                >
-                  <LayoutPanelLeft data-icon="inline-start" /> Context
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={previewContext === "isolated" ? "secondary" : "ghost"}
-                  onClick={() => setPreviewContext("isolated")}
-                >
-                  <SlidersHorizontal data-icon="inline-start" /> Isolated
-                </Button>
-              </div>
             </div>
             <div className="preview-toolbar-controls">
               <div className="preview-viewport-toggle" aria-label="Preview viewport">
@@ -791,21 +778,20 @@ export default function Configurator() {
               <PreviewSelect
                 label="State"
                 value={previewState}
-                onValueChange={(value) => choosePreviewState(value as WidgetState)}
+                onValueChange={(value) => choosePreviewState(value as PreviewState)}
                 options={stateOptions}
               />
             </div>
           </div>
 
           <div className="preview-stage">
-            <Card className={`preview-frame preview-frame-${previewViewport} preview-frame-${previewContext}`}>
+            <Card className={`preview-frame preview-frame-${previewViewport}${previewState === "all" ? " preview-frame-all" : ""}`}>
               <CardContent className="preview-frame-content">
                 <PreviewCanvas
                   config={config}
                   state={previewState}
                   onStateChange={setPreviewState}
                   onEvent={track}
-                  context={previewContext}
                   viewport={previewViewport}
                 />
               </CardContent>
