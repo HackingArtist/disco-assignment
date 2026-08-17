@@ -3,25 +3,31 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import {
   Activity,
+  AlignCenter,
+  AlignLeft,
   Braces,
-  ImageIcon,
-  LayoutPanelLeft,
-  Link2,
+  Check,
   LockKeyhole,
+  Maximize2,
+  Minimize2,
   Monitor,
   RotateCcw,
   SlidersHorizontal,
   Smartphone,
   Sparkles,
-  Upload,
+  X,
+  type LucideIcon,
 } from "lucide-react";
 
 import { PreviewCanvas } from "@/components/offer-widget";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { ColorPicker } from "@/components/ui/color-picker";
+import { Field, FieldControl, FieldError, FieldLabel } from "@/components/ui/field";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,9 +44,7 @@ import {
   googleFontLabels,
   getUploadedAssets,
   isValidHex,
-  isValidImageUrl,
   widgetStateLabels,
-  type AssetReference,
   type GoogleFont,
   type PreviewViewport,
   type PreviewState,
@@ -50,34 +54,56 @@ import {
   type WidgetTheme,
 } from "@/lib/widget-config";
 
-interface FieldProps {
-  id: string;
-  label: string;
-  count?: string;
-  children: ReactNode;
-}
-
 interface ConfigPanelProps {
   config: WidgetConfiguration;
   setConfig: React.Dispatch<React.SetStateAction<WidgetConfiguration>>;
   idPrefix: string;
 }
 
-interface AssetFieldProps {
-  id: string;
+interface ChoiceOption<Value extends string> {
+  value: Value;
   label: string;
-  asset: AssetReference;
-  onChange: (asset: AssetReference) => void;
+  description: string;
+  icon: LucideIcon;
 }
 
-function Field({ id, label, count, children }: FieldProps) {
+function ChoiceCards<Value extends string>({
+  id,
+  label,
+  value,
+  options,
+  onValueChange,
+}: {
+  id: string;
+  label: string;
+  value: Value;
+  options: readonly ChoiceOption<Value>[];
+  onValueChange: (value: Value) => void;
+}) {
   return (
-    <div className="studio-field">
-      <div className="studio-field-heading">
-        <Label htmlFor={id}>{label}</Label>
-        {count && <span className="studio-count">{count}</span>}
-      </div>
-      {children}
+    <div id={id} className="studio-choice-cards" role="radiogroup" aria-label={label}>
+      {options.map((option) => {
+        const selected = value === option.value;
+        const Icon = option.icon;
+        return (
+          <label key={option.value} className="studio-choice-card" data-selected={selected ? "true" : undefined}>
+            <input
+              className="sr-only"
+              type="radio"
+              name={id}
+              value={option.value}
+              checked={selected}
+              onChange={() => onValueChange(option.value)}
+            />
+            <span className="studio-choice-card-icon" aria-hidden="true"><Icon /></span>
+            <span className="studio-choice-card-copy">
+              <span className="studio-choice-card-label">{option.label}</span>
+              <span className="studio-choice-card-description">{option.description}</span>
+            </span>
+            <span className="studio-choice-card-check" aria-hidden="true"><Check /></span>
+          </label>
+        );
+      })}
     </div>
   );
 }
@@ -88,6 +114,17 @@ function SectionHeading({ title }: { title: string }) {
       <h2>{title}</h2>
     </div>
   );
+}
+
+function cssSizeToNumber(value: string): string {
+  const size = value.trim();
+  const match = /^(\d*\.?\d+)(px|rem|em)?$/i.exec(size);
+  if (!match) return "";
+  const number = Number(match[1]);
+  if (!Number.isFinite(number)) return "";
+  const unit = match[2]?.toLowerCase();
+  if (unit === "rem" || unit === "em") return String(number * 16);
+  return String(number);
 }
 
 function ColorField({
@@ -103,26 +140,44 @@ function ColorField({
 }) {
   const valid = isValidHex(value);
   return (
-    <Field id={id} label={label}>
-      <div className="color-input-row">
-        <input
-          id={`${id}-swatch`}
-          className="color-swatch"
-          type="color"
-          value={valid ? value : "#000000"}
-          onChange={(event) => onChange(event.target.value)}
-          aria-label={`${label} color picker`}
-        />
-        <Input
-          id={id}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          aria-invalid={!valid}
-          maxLength={7}
-          className="studio-mono-input"
-        />
+    <Field className="studio-field">
+      <div className="studio-field-heading">
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
       </div>
-      {!valid && <p className="studio-error">Use a six-digit hex value.</p>}
+      <FieldControl>
+        <div className="color-input-row">
+          <ColorPicker
+            value={(valid ? value : "#000000") as `#${string}`}
+            type="hex"
+            onValueChange={(color) => onChange(color.hex)}
+            align="start"
+          >
+            <button
+              id={`${id}-swatch`}
+              className="color-swatch"
+              type="button"
+              style={{ "--color-swatch-value": valid ? value : "#000000" } as React.CSSProperties}
+              aria-label={`Open ${label.toLowerCase()} color picker`}
+            >
+              <span aria-hidden="true" />
+            </button>
+          </ColorPicker>
+          <InputGroup className="studio-input-group">
+            <InputGroupAddon align="inline-start">#</InputGroupAddon>
+            <InputGroupInput
+              id={id}
+              value={value.replace(/^#/, "")}
+              onChange={(event) => onChange(`#${event.target.value}`)}
+              aria-invalid={!valid}
+              maxLength={6}
+              autoComplete="off"
+              spellCheck={false}
+              className="studio-mono-input"
+            />
+          </InputGroup>
+        </div>
+      </FieldControl>
+      {!valid && <FieldError className="studio-error">Use a six-digit hex value.</FieldError>}
     </Field>
   );
 }
@@ -226,50 +281,55 @@ function CssEditor({
   const lineCount = value ? value.split(/\r?\n/).length : 1;
 
   return (
-    <Field id={id} label={label}>
-      <div className="studio-code-editor">
-        <div className="studio-code-toolbar">
-          <div className="studio-code-language">
-            <span className="studio-code-dots" aria-hidden="true"><i /><i /><i /></span>
-            <Braces aria-hidden="true" />
-            <span>CSS</span>
-            <small>{lineCount} {lineCount === 1 ? "line" : "lines"}</small>
-          </div>
-          <Button type="button" variant="ghost" size="sm" className="studio-code-format" onClick={format}>
-            Format
-          </Button>
-        </div>
-        <div className="studio-code-body">
-          <pre ref={highlightRef} className="studio-code-highlight" aria-hidden="true">{highlightCss(value)}</pre>
-          <Textarea
-            id={id}
-            className="studio-css-input"
-            value={value}
-            rows={9}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            placeholder={placeholder}
-            onChange={(event) => onChange(event.target.value)}
-            onBlur={format}
-            onScroll={(event) => {
-              if (!highlightRef.current) return;
-              highlightRef.current.scrollTop = event.currentTarget.scrollTop;
-              highlightRef.current.scrollLeft = event.currentTarget.scrollLeft;
-            }}
-            onKeyDown={(event) => {
-              if (event.key !== "Tab") return;
-              event.preventDefault();
-              const textarea = event.currentTarget;
-              const start = textarea.selectionStart;
-              const end = textarea.selectionEnd;
-              const nextValue = `${value.slice(0, start)}  ${value.slice(end)}`;
-              onChange(nextValue);
-              window.requestAnimationFrame(() => textarea.setSelectionRange(start + 2, start + 2));
-            }}
-          />
-        </div>
+    <Field className="studio-field">
+      <div className="studio-field-heading">
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
       </div>
+      <FieldControl>
+        <div className="studio-code-editor">
+          <div className="studio-code-toolbar">
+            <div className="studio-code-language">
+              <span className="studio-code-dots" aria-hidden="true"><i /><i /><i /></span>
+              <Braces aria-hidden="true" />
+              <span>CSS</span>
+              <small>{lineCount} {lineCount === 1 ? "line" : "lines"}</small>
+            </div>
+            <Button type="button" variant="ghost" size="sm" onClick={format}>
+              Format
+            </Button>
+          </div>
+          <div className="studio-code-body">
+            <pre ref={highlightRef} className="studio-code-highlight" aria-hidden="true">{highlightCss(value)}</pre>
+            <Textarea
+              id={id}
+              className="studio-css-input"
+              value={value}
+              rows={9}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              placeholder={placeholder}
+              onChange={(event) => onChange(event.target.value)}
+              onBlur={format}
+              onScroll={(event) => {
+                if (!highlightRef.current) return;
+                highlightRef.current.scrollTop = event.currentTarget.scrollTop;
+                highlightRef.current.scrollLeft = event.currentTarget.scrollLeft;
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Tab") return;
+                event.preventDefault();
+                const textarea = event.currentTarget;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const nextValue = `${value.slice(0, start)}  ${value.slice(end)}`;
+                onChange(nextValue);
+                window.requestAnimationFrame(() => textarea.setSelectionRange(start + 2, start + 2));
+              }}
+            />
+          </div>
+        </div>
+      </FieldControl>
     </Field>
   );
 }
@@ -309,7 +369,27 @@ function ThemeFromImage({
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [applied, setApplied] = useState<{ colors: string[]; fonts: string } | null>(null);
+  const [pending, setPending] = useState<{ patch: Partial<WidgetTheme>; colors: string[]; fonts: string } | null>(null);
+  const [applied, setApplied] = useState(false);
+  const [localModelStatus, setLocalModelStatus] = useState<"checking" | "connected" | "disconnected">("checking");
+  const extractionControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/extract-theme/status", { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null) as { connected?: boolean } | null;
+        setLocalModelStatus(response.ok && payload?.connected ? "connected" : "disconnected");
+      })
+      .catch((err: unknown) => {
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          setLocalModelStatus("disconnected");
+        }
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => () => extractionControllerRef.current?.abort(), []);
 
   const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -324,15 +404,21 @@ function ThemeFromImage({
       return;
     }
     setError("");
+    let extractionController: AbortController | null = null;
     try {
       const dataUrl = await readImageAsDataUrl(file);
+      extractionControllerRef.current?.abort();
+      extractionController = new AbortController();
+      extractionControllerRef.current = extractionController;
       setPreview(dataUrl);
       setBusy(true);
-      setApplied(null);
+      setPending(null);
+      setApplied(false);
       const response = await fetch("/api/extract-theme", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: dataUrl }),
+        signal: extractionController.signal,
       });
       const payload = (await response.json().catch(() => null)) as {
         theme?: Partial<WidgetTheme>;
@@ -342,68 +428,110 @@ function ThemeFromImage({
         throw new Error(payload?.error ?? "Could not read the image. Try again.");
       }
       const patch = payload?.theme ?? {};
-      onApply(patch);
       const headingLabel = patch.primaryFont ? googleFontLabels[patch.primaryFont] : "";
       const bodyLabel = patch.secondaryFont ? googleFontLabels[patch.secondaryFont] : "";
-      setApplied({
-        colors: [patch.page, patch.surface, patch.text, patch.primary, patch.accent, patch.border]
+      setPending({
+        patch,
+        colors: [patch.page, patch.surface, patch.softSurface, patch.text, patch.primary, patch.accent, patch.border, patch.secondaryButtonBorder]
           .filter((color): color is string => Boolean(color)),
         fonts: [headingLabel, bodyLabel].filter(Boolean).join(" + "),
       });
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Could not read the image. Try again.");
     } finally {
-      setBusy(false);
+      if (extractionControllerRef.current === extractionController) {
+        extractionControllerRef.current = null;
+        setBusy(false);
+      }
     }
   };
 
+  const approve = () => {
+    if (!pending) return;
+    onApply(pending.patch);
+    setApplied(true);
+  };
+
   const clear = () => {
+    extractionControllerRef.current?.abort();
+    extractionControllerRef.current = null;
     setPreview(null);
-    setApplied(null);
+    setBusy(false);
+    setPending(null);
+    setApplied(false);
     setError("");
   };
 
+  const swatches = (colors: string[]) => (
+    <div className="studio-palette" aria-label="Extracted palette">
+      {colors.map((color, index) => (
+        <span key={`${color}-${index}`} className="studio-palette-swatch" style={{ background: color }} title={color} />
+      ))}
+    </div>
+  );
+
   return (
-    <section className="studio-theme-group" aria-labelledby={`${idPrefix}-heading-from-image`}>
-      <div className="studio-theme-group-heading">
-        <h3 id={`${idPrefix}-heading-from-image`}>Generate from image</h3>
+    <section className="studio-theme-group studio-theme-image-group" aria-labelledby={`${idPrefix}-heading-from-image`}>
+      <div className="studio-theme-image-intro">
+        <div className="studio-theme-group-heading studio-theme-image-heading">
+          <h3 id={`${idPrefix}-heading-from-image`}>Detect theme from image</h3>
+          <div className="studio-theme-badges">
+            <Badge className="studio-theme-badge studio-theme-beta-badge" variant="secondary">Beta</Badge>
+            <Badge
+              className="studio-theme-badge studio-theme-connection-badge"
+              variant="outline"
+              data-status={localModelStatus}
+              aria-live="polite"
+              title="Local Codex CLI connection"
+            >
+              <span className="studio-theme-status-dot" aria-hidden="true" />
+              {localModelStatus === "checking"
+                ? "Checking Codex CLI"
+                : localModelStatus === "connected"
+                  ? "Codex CLI connected"
+                  : "Codex CLI not connected"}
+            </Badge>
+          </div>
+        </div>
+        <p className="studio-theme-image-copy">
+          Upload a UI screenshot. The studio reads its color and typography tokens, then you review before applying.
+        </p>
       </div>
-      <p className="studio-theme-image-copy">
-        Upload a UI screenshot and the studio will fill the color and typography tokens from it.
-      </p>
       {preview ? (
         <div className="studio-theme-image-result">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="studio-theme-image-thumb" src={preview} alt="Theme source screenshot" />
-          <div className="studio-theme-image-meta">
-            {busy ? (
-              <p className="studio-theme-image-status">Reading design…</p>
-            ) : applied ? (
-              <>
-                <div className="studio-palette" aria-label="Extracted palette">
-                  {applied.colors.map((color) => (
-                    <span key={color} className="studio-palette-swatch" style={{ background: color }} title={color} />
-                  ))}
-                </div>
-                {applied.fonts && <p className="studio-theme-image-status">Applied {applied.fonts} typography.</p>}
-              </>
-            ) : null}
-            <div className="asset-actions">
-              <label className="asset-upload-button" htmlFor={`${idPrefix}-theme-image`}>
-                <Upload aria-hidden="true" /> Try another
-              </label>
-              <Button type="button" variant="outline" size="sm" onClick={clear} disabled={busy}>
-                <RotateCcw data-icon="inline-start" /> Clear
-              </Button>
-            </div>
-            <input
-              id={`${idPrefix}-theme-image`}
-              className="sr-only"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={handleFile}
-            />
+          <div className="studio-theme-image-preview" data-loading={busy || undefined}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="studio-theme-image-thumb" src={preview} alt="Theme source screenshot" />
+            <button
+              className="studio-theme-image-clear"
+              type="button"
+              onClick={clear}
+              aria-label="Clear uploaded screenshot"
+            >
+              <X aria-hidden="true" />
+            </button>
           </div>
+          {!busy && pending && (
+            <div className="studio-theme-image-meta">
+              {!applied ? (
+                <>
+                  {swatches(pending.colors)}
+                  {pending.fonts && <p className="studio-theme-image-status">Suggested {pending.fonts} typography.</p>}
+                  <div className="asset-actions">
+                    <Button type="button" size="sm" onClick={approve}>
+                      <Check data-icon="inline-start" /> Apply theme
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {swatches(pending.colors)}
+                  <p className="studio-theme-image-status studio-theme-image-status-success">Theme applied.</p>
+                </>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -421,103 +549,6 @@ function ThemeFromImage({
       )}
       {error && <p className="studio-error">{error}</p>}
     </section>
-  );
-}
-
-function AssetField({ id, label, asset, onChange }: AssetFieldProps) {
-  const [error, setError] = useState("");
-  const validUrl = isValidImageUrl(asset.kind === "url" ? asset.src : "");
-
-  const replaceAsset = (next: AssetReference) => {
-    if (asset.kind === "upload" && asset.src && asset.src !== next.src) {
-      URL.revokeObjectURL(asset.src);
-    }
-    onChange(next);
-  };
-
-  const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setError("Upload a PNG, JPEG, or WebP image.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Keep image files under 5 MB.");
-      return;
-    }
-    setError("");
-    replaceAsset({
-      ...asset,
-      kind: "upload",
-      src: URL.createObjectURL(file),
-      fileName: file.name,
-    });
-  };
-
-  return (
-    <div className="studio-asset-field">
-      <div className="studio-field-heading">
-        <Label>{label}</Label>
-      </div>
-      <div className="asset-actions">
-        <label className="asset-upload-button" htmlFor={`${id}-upload`}>
-          <Upload aria-hidden="true" /> Upload
-        </label>
-        <input
-          id={`${id}-upload`}
-          className="sr-only"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={handleUpload}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setError("");
-            replaceAsset({ ...asset, kind: "fallback", src: "", fileName: undefined });
-          }}
-        >
-          <ImageIcon data-icon="inline-start" /> Fallback
-        </Button>
-      </div>
-      {asset.kind === "upload" && asset.fileName && (
-        <p className="asset-file-name">{asset.fileName}</p>
-      )}
-      <div className="asset-url-row">
-        <Link2 aria-hidden="true" />
-        <Input
-          id={`${id}-url`}
-          value={asset.kind === "url" ? asset.src : ""}
-          placeholder="https://…"
-          aria-label={`${label} URL`}
-          aria-invalid={!validUrl}
-          onChange={(event) => {
-            const src = event.target.value;
-            setError("");
-            replaceAsset({
-              ...asset,
-              kind: src ? "url" : "fallback",
-              src,
-              fileName: undefined,
-            });
-          }}
-        />
-      </div>
-      {!validUrl && <p className="studio-error">Use a complete http:// or https:// image URL.</p>}
-      {error && <p className="studio-error">{error}</p>}
-      <Field id={`${id}-alt`} label="Image description">
-        <Input
-          id={`${id}-alt`}
-          value={asset.alt}
-          maxLength={90}
-          onChange={(event) => onChange({ ...asset, alt: event.target.value })}
-        />
-      </Field>
-    </div>
   );
 }
 
@@ -543,13 +574,6 @@ function SwitchRow({
 }
 
 function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
-  const updateMerchant = <Key extends keyof WidgetConfiguration["merchant"]>(
-    key: Key,
-    value: WidgetConfiguration["merchant"][Key],
-  ) => setConfig((current) => ({
-    ...current,
-    merchant: { ...current.merchant, [key]: value },
-  }));
   const updateTheme = <Key extends keyof WidgetConfiguration["theme"]>(
     key: Key,
     value: WidgetConfiguration["theme"][Key],
@@ -572,11 +596,7 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
 
   return (
     <Tabs defaultValue="info" className="studio-config-tabs">
-      <div className="studio-panel-header">
-        <div>
-          <h1>Offer widget</h1>
-        </div>
-      </div>
+      <h1 className="sr-only">Offer widget</h1>
       <TabsList className="studio-tabs-list">
         <TabsTrigger value="info">Info</TabsTrigger>
         <TabsTrigger value="theme">Theme</TabsTrigger>
@@ -584,65 +604,105 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
       </TabsList>
 
       <TabsContent value="info" className="studio-tab-content">
-        <SectionHeading title="Merchant identity" />
+        <div className="studio-theme-stack">
+          <ThemeFromImage idPrefix={idPrefix} onApply={applyThemePatch} />
+        </div>
+        <SectionHeading title="Alignment" />
         <div className="studio-field-stack">
-          <AssetField
-            id={`${idPrefix}-merchant-logo`}
-            label="Merchant logo"
-            asset={config.merchant.logo}
-            onChange={(logo) => updateMerchant("logo", logo)}
-          />
-          <Field id={`${idPrefix}-density`} label="Default density">
-            <Select value={config.behavior.density} onValueChange={(value) => updateBehavior("density", value as WidgetConfiguration["behavior"]["density"])}>
-              <SelectTrigger id={`${idPrefix}-density`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="compact">Space-aware</SelectItem>
-                <SelectItem value="roomy">Roomy</SelectItem>
-              </SelectContent>
-            </Select>
+          <Field className="studio-field">
+            <div className="studio-field-heading">
+              <FieldLabel htmlFor={`${idPrefix}-alignment`}>Content alignment</FieldLabel>
+            </div>
+            <FieldControl>
+              <ChoiceCards
+                id={`${idPrefix}-alignment`}
+                label="Content alignment"
+                value={config.behavior.alignment}
+                options={[
+                  { value: "left", label: "Left", description: "Logo beside the copy", icon: AlignLeft },
+                  { value: "center", label: "Center", description: "Logo above centered copy", icon: AlignCenter },
+                ]}
+                onValueChange={(value) => updateBehavior("alignment", value)}
+              />
+            </FieldControl>
+          </Field>
+          <Field className="studio-field">
+            <div className="studio-field-heading">
+              <FieldLabel htmlFor={`${idPrefix}-density`}>Default density</FieldLabel>
+            </div>
+            <FieldControl>
+              <ChoiceCards
+                id={`${idPrefix}-density`}
+                label="Default density"
+                value={config.behavior.density}
+                options={[
+                  { value: "compact", label: "Space-aware", description: "Fits tighter spaces", icon: Minimize2 },
+                  { value: "roomy", label: "Roomy", description: "Adds more breathing room", icon: Maximize2 },
+                ]}
+                onValueChange={(value) => updateBehavior("density", value)}
+              />
+            </FieldControl>
           </Field>
         </div>
       </TabsContent>
 
       <TabsContent value="theme" className="studio-tab-content">
         <div className="studio-theme-stack">
-          <ThemeFromImage idPrefix={idPrefix} onApply={applyThemePatch} />
           <section className="studio-theme-group" aria-labelledby={`${idPrefix}-heading-typography`}>
             <div className="studio-theme-group-heading">
               <h3 id={`${idPrefix}-heading-typography`}>Heading typography</h3>
             </div>
             <div className="studio-theme-grid">
               <ColorField id={`${idPrefix}-text`} label="Heading Text" value={config.theme.text} onChange={(value) => updateTheme("text", value)} />
-              <Field id={`${idPrefix}-primary-font`} label="Primary Font">
-                <Select value={config.theme.primaryFont} onValueChange={(value) => updateTheme("primaryFont", value as GoogleFont)}>
-                  <SelectTrigger id={`${idPrefix}-primary-font`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.entries(googleFontLabels) as [GoogleFont, string][]).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-primary-font`}>Primary Font</FieldLabel>
+                </div>
+                <FieldControl>
+                  <Select value={config.theme.primaryFont} onValueChange={(value) => updateTheme("primaryFont", value as GoogleFont)}>
+                    <SelectTrigger id={`${idPrefix}-primary-font`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.entries(googleFontLabels) as [GoogleFont, string][]).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FieldControl>
               </Field>
-              <Field id={`${idPrefix}-heading-size`} label="Font size">
-                <Input
-                  id={`${idPrefix}-heading-size`}
-                  list={`${idPrefix}-heading-size-options`}
-                  className="studio-size-combobox"
-                  value={config.theme.headingFontSize}
-                  placeholder="36px"
-                  onChange={(event) => updateTheme("headingFontSize", event.target.value)}
-                />
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-heading-size`}>Font size</FieldLabel>
+                </div>
+                <FieldControl>
+                  <InputGroup className="studio-input-group">
+                    <InputGroupInput
+                      id={`${idPrefix}-heading-size`}
+                      list={`${idPrefix}-heading-size-options`}
+                      className="studio-size-combobox"
+                      inputMode="decimal"
+                      value={cssSizeToNumber(config.theme.headingFontSize)}
+                      placeholder="36"
+                      onChange={(event) => updateTheme("headingFontSize", `${event.target.value}px`)}
+                    />
+                    <InputGroupAddon align="inline-end">px</InputGroupAddon>
+                  </InputGroup>
+                </FieldControl>
                 <datalist id={`${idPrefix}-heading-size-options`}>
-                  {["24px", "28px", "32px", "36px", "40px", "48px", "56px", "2.25rem"].map((size) => <option key={size} value={size} />)}
+                  {["24", "28", "32", "36", "40", "48", "56"].map((size) => <option key={size} value={size} />)}
                 </datalist>
               </Field>
-              <Field id={`${idPrefix}-heading-weight`} label="Font weight">
-                <Select value={String(config.theme.headingFontWeight)} onValueChange={(value) => updateTheme("headingFontWeight", Number(value))}>
-                  <SelectTrigger id={`${idPrefix}-heading-weight`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[400, 500, 600, 700].map((weight) => <SelectItem key={weight} value={String(weight)}>{weight}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-heading-weight`}>Font weight</FieldLabel>
+                </div>
+                <FieldControl>
+                  <Select value={String(config.theme.headingFontWeight)} onValueChange={(value) => updateTheme("headingFontWeight", Number(value))}>
+                    <SelectTrigger id={`${idPrefix}-heading-weight`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[400, 500, 600, 700].map((weight) => <SelectItem key={weight} value={String(weight)}>{weight}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FieldControl>
               </Field>
             </div>
           </section>
@@ -653,36 +713,55 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
             </div>
             <div className="studio-theme-grid">
               <ColorField id={`${idPrefix}-muted-text`} label="Secondary Text" value={config.theme.mutedText} onChange={(value) => updateTheme("mutedText", value)} />
-              <Field id={`${idPrefix}-secondary-font`} label="Secondary Font">
-                <Select value={config.theme.secondaryFont} onValueChange={(value) => updateTheme("secondaryFont", value as GoogleFont)}>
-                  <SelectTrigger id={`${idPrefix}-secondary-font`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.entries(googleFontLabels) as [GoogleFont, string][]).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-secondary-font`}>Secondary Font</FieldLabel>
+                </div>
+                <FieldControl>
+                  <Select value={config.theme.secondaryFont} onValueChange={(value) => updateTheme("secondaryFont", value as GoogleFont)}>
+                    <SelectTrigger id={`${idPrefix}-secondary-font`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.entries(googleFontLabels) as [GoogleFont, string][]).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FieldControl>
               </Field>
-              <Field id={`${idPrefix}-secondary-size`} label="Font size">
-                <Input
-                  id={`${idPrefix}-secondary-size`}
-                  list={`${idPrefix}-secondary-size-options`}
-                  className="studio-size-combobox"
-                  value={config.theme.secondaryFontSize}
-                  placeholder="14px"
-                  onChange={(event) => updateTheme("secondaryFontSize", event.target.value)}
-                />
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-secondary-size`}>Font size</FieldLabel>
+                </div>
+                <FieldControl>
+                  <InputGroup className="studio-input-group">
+                    <InputGroupInput
+                      id={`${idPrefix}-secondary-size`}
+                      list={`${idPrefix}-secondary-size-options`}
+                      className="studio-size-combobox"
+                      inputMode="decimal"
+                      value={cssSizeToNumber(config.theme.secondaryFontSize)}
+                      placeholder="14"
+                      onChange={(event) => updateTheme("secondaryFontSize", `${event.target.value}px`)}
+                    />
+                    <InputGroupAddon align="inline-end">px</InputGroupAddon>
+                  </InputGroup>
+                </FieldControl>
                 <datalist id={`${idPrefix}-secondary-size-options`}>
-                  {["8px", "9px", "10px", "11px", "12px", "14px", "16px", "1rem"].map((size) => <option key={size} value={size} />)}
+                  {["8", "9", "10", "11", "12", "14", "16"].map((size) => <option key={size} value={size} />)}
                 </datalist>
               </Field>
-              <Field id={`${idPrefix}-secondary-weight`} label="Font weight">
-                <Select value={String(config.theme.secondaryFontWeight)} onValueChange={(value) => updateTheme("secondaryFontWeight", Number(value))}>
-                  <SelectTrigger id={`${idPrefix}-secondary-weight`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[300, 400, 500, 600, 700].map((weight) => <SelectItem key={weight} value={String(weight)}>{weight}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-secondary-weight`}>Font weight</FieldLabel>
+                </div>
+                <FieldControl>
+                  <Select value={String(config.theme.secondaryFontWeight)} onValueChange={(value) => updateTheme("secondaryFontWeight", Number(value))}>
+                    <SelectTrigger id={`${idPrefix}-secondary-weight`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[300, 400, 500, 600, 700].map((weight) => <SelectItem key={weight} value={String(weight)}>{weight}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FieldControl>
               </Field>
             </div>
           </section>
@@ -693,14 +772,53 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
             </div>
             <div className="studio-theme-grid">
               <ColorField id={`${idPrefix}-surface`} label="Background" value={config.theme.surface} onChange={(value) => updateTheme("surface", value)} />
-              <ColorField id={`${idPrefix}-border`} label="Border" value={config.theme.border} onChange={(value) => updateTheme("border", value)} />
+              <ColorField id={`${idPrefix}-border`} label="Container Border" value={config.theme.border} onChange={(value) => updateTheme("border", value)} />
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-container-radius`}>Container radius</FieldLabel>
+                  <span className="studio-count">{config.theme.containerRadius}px</span>
+                </div>
+                <FieldControl>
+                  <Slider id={`${idPrefix}-container-radius`} min={0} max={24} step={2} value={[config.theme.containerRadius]} onValueChange={(value) => updateTheme("containerRadius", Array.isArray(value) ? (value[0] ?? 0) : value)} />
+                </FieldControl>
+              </Field>
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-container-stroke-width`}>Container stroke</FieldLabel>
+                  <span className="studio-count">{config.theme.containerBorderWidth}px</span>
+                </div>
+                <FieldControl>
+                  <Slider id={`${idPrefix}-container-stroke-width`} min={0} max={4} step={1} value={[config.theme.containerBorderWidth]} onValueChange={(value) => updateTheme("containerBorderWidth", Array.isArray(value) ? (value[0] ?? 0) : value)} />
+                </FieldControl>
+              </Field>
+            </div>
+          </section>
+
+          <section className="studio-theme-group" aria-labelledby={`${idPrefix}-buttons`}>
+            <div className="studio-theme-group-heading">
+              <h3 id={`${idPrefix}-buttons`}>Buttons</h3>
+            </div>
+            <div className="studio-theme-grid">
               <ColorField id={`${idPrefix}-primary`} label="Primary Button" value={config.theme.primary} onChange={(value) => updateTheme("primary", value)} />
               <ColorField id={`${idPrefix}-soft-surface`} label="Secondary Button" value={config.theme.softSurface} onChange={(value) => updateTheme("softSurface", value)} />
-              <Field id={`${idPrefix}-radius`} label="Corner radius" count={`${config.theme.radius}px`}>
-                <Slider id={`${idPrefix}-radius`} min={0} max={20} step={2} value={[config.theme.radius]} onValueChange={(value) => updateTheme("radius", Array.isArray(value) ? (value[0] ?? 0) : value)} />
+              <ColorField id={`${idPrefix}-secondary-button-border`} label="Secondary Border" value={config.theme.secondaryButtonBorder} onChange={(value) => updateTheme("secondaryButtonBorder", value)} />
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-button-radius`}>Button radius</FieldLabel>
+                  <span className="studio-count">{config.theme.buttonRadius}px</span>
+                </div>
+                <FieldControl>
+                  <Slider id={`${idPrefix}-button-radius`} min={0} max={24} step={2} value={[config.theme.buttonRadius]} onValueChange={(value) => updateTheme("buttonRadius", Array.isArray(value) ? (value[0] ?? 0) : value)} />
+                </FieldControl>
               </Field>
-              <Field id={`${idPrefix}-stroke-width`} label="Stroke" count={`${config.theme.borderWidth}px`}>
-                <Slider id={`${idPrefix}-stroke-width`} min={0} max={4} step={1} value={[config.theme.borderWidth]} onValueChange={(value) => updateTheme("borderWidth", Array.isArray(value) ? (value[0] ?? 1) : value)} />
+              <Field className="studio-field">
+                <div className="studio-field-heading">
+                  <FieldLabel htmlFor={`${idPrefix}-secondary-button-stroke-width`}>Secondary stroke</FieldLabel>
+                  <span className="studio-count">{config.theme.secondaryButtonBorderWidth}px</span>
+                </div>
+                <FieldControl>
+                  <Slider id={`${idPrefix}-secondary-button-stroke-width`} min={0} max={4} step={1} value={[config.theme.secondaryButtonBorderWidth]} onValueChange={(value) => updateTheme("secondaryButtonBorderWidth", Array.isArray(value) ? (value[0] ?? 0) : value)} />
+                </FieldControl>
               </Field>
             </div>
           </section>
@@ -738,23 +856,33 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
       <TabsContent value="behavior" className="studio-tab-content">
         <SectionHeading title="Widget behavior" />
         <div className="studio-field-stack">
-          <Field id={`${idPrefix}-rejection`} label="After rejection">
-            <Select value={config.behavior.rejectionFlow} onValueChange={(value) => updateBehavior("rejectionFlow", value as WidgetConfiguration["behavior"]["rejectionFlow"])}>
-              <SelectTrigger id={`${idPrefix}-rejection`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="alternatives">Show alternatives</SelectItem>
-                <SelectItem value="dismiss">Dismiss immediately</SelectItem>
-              </SelectContent>
-            </Select>
+          <Field className="studio-field">
+            <div className="studio-field-heading">
+              <FieldLabel htmlFor={`${idPrefix}-rejection`}>After rejection</FieldLabel>
+            </div>
+            <FieldControl>
+              <Select value={config.behavior.rejectionFlow} onValueChange={(value) => updateBehavior("rejectionFlow", value as WidgetConfiguration["behavior"]["rejectionFlow"])}>
+                <SelectTrigger id={`${idPrefix}-rejection`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="alternatives">Show alternatives</SelectItem>
+                  <SelectItem value="dismiss">Dismiss immediately</SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldControl>
           </Field>
-          <Field id={`${idPrefix}-claim-mode`} label="After claim">
-            <Select value={config.behavior.claimMode} onValueChange={(value) => updateBehavior("claimMode", value as WidgetConfiguration["behavior"]["claimMode"])}>
-              <SelectTrigger id={`${idPrefix}-claim-mode`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="coupon">Coupon and shop link</SelectItem>
-                <SelectItem value="email">Email confirmation only</SelectItem>
-              </SelectContent>
-            </Select>
+          <Field className="studio-field">
+            <div className="studio-field-heading">
+              <FieldLabel htmlFor={`${idPrefix}-claim-mode`}>After claim</FieldLabel>
+            </div>
+            <FieldControl>
+              <Select value={config.behavior.claimMode} onValueChange={(value) => updateBehavior("claimMode", value as WidgetConfiguration["behavior"]["claimMode"])}>
+                <SelectTrigger id={`${idPrefix}-claim-mode`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="coupon">Coupon and shop link</SelectItem>
+                  <SelectItem value="email">Email confirmation only</SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldControl>
           </Field>
           <Separator />
           <SwitchRow
@@ -857,15 +985,23 @@ export default function Configurator() {
     <main className="studio-shell">
       <header className="studio-header">
         <div className="studio-brand">
-          <span className="studio-mark" aria-hidden="true"><LayoutPanelLeft /></span>
-          <div>
-            <strong>Disco Offer Studio</strong>
-            <span>Post-purchase widget configurator</span>
-          </div>
+          <img className="studio-mark" src="/disco-logo.png" alt="Disco logo" />
+          <strong>Publisher Studio</strong>
         </div>
+        <Breadcrumb className="studio-header-breadcrumb">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/">Home</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Post Purchase Offer Widget</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <div className="studio-header-actions">
           <Badge variant="secondary" className="studio-session-badge">Unsaved session</Badge>
-          <Button variant="ghost" size="sm" type="button" onClick={reset}>
+          <Button variant="ghost" type="button" onClick={reset}>
             <RotateCcw data-icon="inline-start" /> Reset
           </Button>
           <Tooltip>
@@ -873,16 +1009,15 @@ export default function Configurator() {
               render={
                 <Button
                   type="button"
-                  size="lg"
                   className="locked-integration-button"
                   aria-disabled="true"
                   onClick={(event) => event.preventDefault()}
                 />
               }
             >
-              <LockKeyhole data-icon="inline-start" /> Integrate
+              <LockKeyhole data-icon="inline-start" /> Deploy
             </TooltipTrigger>
-            <TooltipContent side="bottom">Integration is coming soon.</TooltipContent>
+            <TooltipContent side="bottom">Deployment is coming soon.</TooltipContent>
           </Tooltip>
           <Sheet>
             <SheetTrigger render={<Button className="mobile-config-trigger" variant="outline" size="icon-lg" aria-label="Open configuration" />}>

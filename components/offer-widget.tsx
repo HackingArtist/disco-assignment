@@ -34,6 +34,12 @@ interface PreviewCanvasProps {
 
 const CUSTOM_BUTTON_STATES = ["hover", "active", "focus", "focus-visible", "disabled"] as const;
 
+const FALLBACK_LOGOS: Record<AssetReference["fallback"], string> = {
+  bottle: "/partner-logos/45-degrees.svg",
+  journal: "/partner-logos/blue-wave.svg",
+  socks: "/partner-logos/green-bars.svg",
+};
+
 function sanitizeCssDeclarations(source: string): string {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -79,28 +85,10 @@ function normalizeCssSize(value: string, fallback: string): string {
 }
 
 function FallbackArtwork({ kind }: { kind: AssetReference["fallback"] }) {
-  if (kind === "journal") {
-    return (
-      <div className="ow-artwork ow-artwork-journal" aria-hidden="true">
-        <div className="ow-journal-shadow" />
-        <div className="ow-journal"><span>FIELD<br />NOTES</span></div>
-        <i className="ow-pencil" />
-      </div>
-    );
-  }
-
-  if (kind === "socks") {
-    return (
-      <div className="ow-artwork ow-artwork-socks" aria-hidden="true">
-        <div className="ow-sock ow-sock-one"><span>R</span></div>
-        <div className="ow-sock ow-sock-two"><span>R</span></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="ow-artwork ow-artwork-logo-placeholder" aria-hidden="true">
-      <div className="ow-logo-placeholder">Logo</div>
+    <div className={`ow-artwork ow-fallback-partner-logo ow-fallback-partner-logo-${kind}`} aria-hidden="true">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={FALLBACK_LOGOS[kind]} alt="" />
     </div>
   );
 }
@@ -127,8 +115,9 @@ function OfferLogo({ asset }: { asset: AssetReference }) {
 
   if (asset.kind === "fallback" || !asset.src || failed) {
     return (
-      <div className="ow-alternative-logo ow-logo-placeholder" aria-hidden="true">
-        Logo
+      <div className="ow-alternative-logo ow-fallback-partner-logo" aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={FALLBACK_LOGOS[asset.fallback]} alt="" />
       </div>
     );
   }
@@ -154,7 +143,7 @@ function WidgetFooter({ config }: { config: WidgetConfiguration }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logo.src} alt="" onError={() => setFailedLogo(true)} />
         ) : (
-          <strong className="ow-powered-by-wordmark">{config.merchant.wordmark}</strong>
+          <span className="ow-powered-by-name">{config.merchant.name}</span>
         )}
       </p>
       {config.behavior.showDisclosure && <p className="ow-disclosure">{config.disclosure}</p>}
@@ -218,7 +207,7 @@ export function OfferWidget({
   };
 
   return (
-    <aside className={`ow-widget ow-density-${config.behavior.density}${config.behavior.showArtwork ? "" : " ow-without-artwork"}`} aria-label="Benefit unlocked by your order">
+    <aside className={`ow-widget ow-density-${config.behavior.density} ow-alignment-${config.behavior.alignment}${config.behavior.showArtwork ? "" : " ow-without-artwork"}`} aria-label="Benefit unlocked by your order">
       {state === "default" && (
         <section className="ow-panel ow-primary-offer">
           <div className="ow-offer-intro">
@@ -235,28 +224,32 @@ export function OfferWidget({
             </button>
             <button className="ow-button ow-button-quiet" type="button" onClick={reject}>No, thanks</button>
           </div>
+          <WidgetFooter config={config} />
         </section>
       )}
 
       {state === "loading" && (
         <section className="ow-panel ow-status-panel ow-loading-panel" aria-live="polite" aria-busy="true">
-          <div className="ow-loading-mark" aria-hidden="true">
-            <svg viewBox="0 0 52 32" focusable="false">
-              <path
-                className="ow-infinity-track"
-                pathLength="100"
-                d="M26 16C20 8 16 5 11 5C4 5 1 10 1 16C1 22 4 27 11 27C16 27 20 24 26 16C32 8 36 5 41 5C48 5 51 10 51 16C51 22 48 27 41 27C36 27 32 24 26 16Z"
-              />
-              <path
-                className="ow-infinity-runner"
-                pathLength="100"
-                d="M26 16C20 8 16 5 11 5C4 5 1 10 1 16C1 22 4 27 11 27C16 27 20 24 26 16C32 8 36 5 41 5C48 5 51 10 51 16C51 22 48 27 41 27C36 27 32 24 26 16Z"
-              />
-            </svg>
+          <div className="ow-status-content">
+            <div className="ow-loading-mark" aria-hidden="true">
+              <svg viewBox="0 0 52 32" focusable="false">
+                <path
+                  className="ow-infinity-track"
+                  pathLength="100"
+                  d="M26 16C20 8 16 5 11 5C4 5 1 10 1 16C1 22 4 27 11 27C16 27 20 24 26 16C32 8 36 5 41 5C48 5 51 10 51 16C51 22 48 27 41 27C36 27 32 24 26 16Z"
+                />
+                <path
+                  className="ow-infinity-runner"
+                  pathLength="100"
+                  d="M26 16C20 8 16 5 11 5C4 5 1 10 1 16C1 22 4 27 11 27C16 27 20 24 26 16C32 8 36 5 41 5C48 5 51 10 51 16C51 22 48 27 41 27C36 27 32 24 26 16Z"
+                />
+              </svg>
+            </div>
+            <h2>Checking your other unlocked perks…</h2>
+            <p>These benefits come with your order.</p>
+            <div className="ow-loading-lines"><i /><i /><i /></div>
           </div>
-          <h2>Checking your other unlocked perks…</h2>
-          <p>These benefits come with your order.</p>
-          <div className="ow-loading-lines"><i /><i /><i /></div>
+          <WidgetFooter config={config} />
         </section>
       )}
 
@@ -293,51 +286,61 @@ export function OfferWidget({
 
       {state === "claimed" && (
         <section className="ow-panel ow-status-panel ow-claimed-panel" aria-live="polite">
-          <h2>Your {claimedOffer.partnerName} benefit is ready.</h2>
-          <p>We added it to your order and emailed the details to <strong>aashish@gmail.com</strong>.</p>
-          {config.behavior.claimMode === "coupon" && (
-            <div className="ow-status-actions ow-claimed-actions">
-              <button className="ow-coupon" type="button" onClick={copyCode} aria-label={`Copy offer code ${claimedOffer.couponCode}`}>
-                <span>{claimedOffer.couponCode}</span>
-                <strong>{copied ? "Copied" : "Copy"}</strong>
-              </button>
-              <a className="ow-button ow-button-primary" href="#partner">{claimedOffer.destinationLabel}</a>
-            </div>
-          )}
+          <div className="ow-status-content">
+            <h2>Your {claimedOffer.partnerName} benefit is ready.</h2>
+            <p>We added it to your order and emailed the details to <strong>aashish@gmail.com</strong>.</p>
+            {config.behavior.claimMode === "coupon" && (
+              <div className="ow-status-actions ow-claimed-actions">
+                <button className="ow-coupon" type="button" onClick={copyCode} aria-label={`Copy offer code ${claimedOffer.couponCode}`}>
+                  <span>{claimedOffer.couponCode}</span>
+                  <strong>{copied ? "Copied" : "Copy"}</strong>
+                </button>
+                <a className="ow-button ow-button-primary" href="#partner">{claimedOffer.destinationLabel}</a>
+              </div>
+            )}
+          </div>
+          <WidgetFooter config={config} />
         </section>
       )}
 
       {state === "error" && (
         <section className="ow-panel ow-status-panel ow-error-panel" aria-live="polite">
-          <span className="ow-status-icon">↻</span>
-          <h2>That didn&apos;t work.</h2>
-          <p>Your order is safe. Want to try again?</p>
-          <div className="ow-status-actions">
-            <button className="ow-button ow-button-primary" type="button" onClick={reject}>Try again</button>
-            <button className="ow-button ow-button-quiet" type="button" onClick={() => moveTo("exit")}>No thanks</button>
+          <div className="ow-status-content">
+            <span className="ow-status-icon">↻</span>
+            <h2>That didn&apos;t work.</h2>
+            <p>Your order is safe. Want to try again?</p>
+            <div className="ow-status-actions">
+              <button className="ow-button ow-button-primary" type="button" onClick={reject}>Try again</button>
+              <button className="ow-button ow-button-quiet" type="button" onClick={() => moveTo("exit")}>No thanks</button>
+            </div>
           </div>
+          <WidgetFooter config={config} />
         </section>
       )}
 
       {state === "empty" && (
         <section className="ow-panel ow-status-panel ow-empty-panel" aria-live="polite">
-          <span className="ow-status-icon">✦</span>
-          <h2>Nothing else for now.</h2>
-          <p>Enjoy your new runners.</p>
-          <button className="ow-text-action" type="button" onClick={() => moveTo("default")}>Return to order</button>
+          <div className="ow-status-content">
+            <span className="ow-status-icon">✦</span>
+            <h2>Nothing else for now.</h2>
+            <p>Enjoy your new runners.</p>
+            <button className="ow-button ow-button-quiet" type="button" onClick={() => moveTo("default")}>Return to order</button>
+          </div>
+          <WidgetFooter config={config} />
         </section>
       )}
 
       {state === "exit" && (
         <section className="ow-panel ow-status-panel ow-exit-panel" aria-live="polite">
-          <span className="ow-status-icon">✓</span>
-          <h2>Enjoy your order.</h2>
-          <p>Thanks for letting us know.</p>
-          <button className="ow-text-action" type="button" onClick={() => moveTo("default")}>Undo</button>
+          <div className="ow-status-content">
+            <span className="ow-status-icon">✓</span>
+            <h2>Enjoy your order.</h2>
+            <p>Thanks for letting us know.</p>
+            <button className="ow-button ow-button-quiet" type="button" onClick={() => moveTo("default")}>Undo</button>
+          </div>
+          <WidgetFooter config={config} />
         </section>
       )}
-
-      <WidgetFooter config={config} />
     </aside>
   );
 }
@@ -363,8 +366,11 @@ export function PreviewCanvas({
     "--ow-primary-text": config.theme.primaryText,
     "--ow-accent": config.theme.accent,
     "--ow-border": config.theme.border,
-    "--ow-radius": `${config.theme.radius}px`,
-    "--ow-stroke-width": `${config.theme.borderWidth}px`,
+    "--ow-secondary-button-border": config.theme.secondaryButtonBorder,
+    "--ow-container-radius": `${config.theme.containerRadius}px`,
+    "--ow-container-stroke-width": `${config.theme.containerBorderWidth}px`,
+    "--ow-button-radius": `${config.theme.buttonRadius}px`,
+    "--ow-secondary-button-stroke-width": `${config.theme.secondaryButtonBorderWidth}px`,
     "--ow-display-font": googleFontVariables[config.theme.primaryFont],
     "--ow-body-font": googleFontVariables[config.theme.secondaryFont],
     "--ow-heading-size": normalizeCssSize(config.theme.headingFontSize, "36px"),

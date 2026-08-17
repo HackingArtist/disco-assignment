@@ -10,6 +10,7 @@ export type WidgetState =
 export type PreviewState = WidgetState | "all";
 
 export type WidgetDensity = "compact" | "roomy";
+export type WidgetAlignment = "left" | "center";
 export type PreviewViewport = "desktop" | "mobile";
 export type GoogleFont = "cormorant-garamond" | "dm-sans" | "fraunces" | "space-grotesk";
 export type ArtworkKind = "bottle" | "journal" | "socks";
@@ -33,7 +34,6 @@ export interface AssetReference {
 
 export interface MerchantBrand {
   name: string;
-  wordmark: string;
   contactEmail: string;
   logo: AssetReference;
 }
@@ -48,8 +48,11 @@ export interface WidgetTheme {
   primaryText: string;
   accent: string;
   border: string;
-  radius: number;
-  borderWidth: number;
+  secondaryButtonBorder: string;
+  containerRadius: number;
+  containerBorderWidth: number;
+  buttonRadius: number;
+  secondaryButtonBorderWidth: number;
   primaryFont: GoogleFont;
   secondaryFont: GoogleFont;
   headingFontSize: string;
@@ -76,6 +79,7 @@ export interface OfferConfig {
 
 export interface WidgetBehavior {
   density: WidgetDensity;
+  alignment: WidgetAlignment;
   rejectionFlow: "alternatives" | "dismiss";
   claimMode: "coupon" | "email";
   showArtwork: boolean;
@@ -120,8 +124,7 @@ export const googleFontVariables: Record<GoogleFont, string> = {
 
 export const defaultWidgetConfiguration: WidgetConfiguration = {
   merchant: {
-    name: "Noma",
-    wordmark: "NOMA",
+    name: "Disco Network",
     contactEmail: "hello@noma.example",
     logo: {
       kind: "fallback",
@@ -140,8 +143,11 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     primaryText: "#fffdf9",
     accent: "#d39c72",
     border: "#d8d3c9",
-    radius: 0,
-    borderWidth: 0,
+    secondaryButtonBorder: "#d8d3c9",
+    containerRadius: 0,
+    containerBorderWidth: 0,
+    buttonRadius: 0,
+    secondaryButtonBorderWidth: 0,
     primaryFont: "cormorant-garamond",
     secondaryFont: "dm-sans",
     headingFontSize: "36px",
@@ -154,13 +160,13 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
   primaryOffer: {
     id: "morrow",
     partnerName: "Morrow",
-    headline: "Your order unlocked a trail perk.",
-    introduction: "You’ve earned $20 toward Morrow’s insulated Ridge bottle.",
+    headline: "Your order unlocked a 1 month free trial.",
+    introduction: "Morrow’s premium trekking club membership. Join the group of elite adventurers every month for exclusive experiences.",
     title: "Your Morrow bottle benefit",
-    detail: "$20 toward the insulated Ridge bottle · 24 oz",
+    detail: "Premium trekking club membership · 1 month free trial",
     expiry: "Your perk is available for the next 24 hours",
     claimLabel: "Use my benefit",
-    couponCode: "NOMA20",
+    couponCode: "MORROW20",
     destinationLabel: "Shop Morrow",
     image: {
       kind: "fallback",
@@ -175,8 +181,8 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
       partnerName: "Field Notes",
       headline: "Your order includes trail notes",
       introduction: "A place for routes, notes, and new ideas.",
-      title: "A trail-ready extra",
-      detail: "Your order unlocks a complimentary 3-pack.",
+      title: "Your order unlocks a complimentary 3-pack ",
+      detail: "Camelin's Field Notes trail journal, perfect for your next adventure.",
       expiry: "Your perk is available for 24 hours",
       claimLabel: "Choose this benefit",
       couponCode: "TRAILSET",
@@ -193,8 +199,8 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
       partnerName: "Ritual Goods",
       headline: "Your order unlocked trail comfort",
       introduction: "A 25% benefit on Ritual Goods merino running socks.",
-      title: "A comfort perk for the trail",
-      detail: "Your order unlocks 25% on soft merino running socks.",
+      title: "Your order unlocks 25% off",
+      detail: "Merino running socks pack of 6, made in the USA.",
       expiry: "Your perk is available for 24 hours",
       claimLabel: "Choose this benefit",
       couponCode: "RITUAL25",
@@ -209,6 +215,7 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
   ],
   behavior: {
     density: "compact",
+    alignment: "left",
     rejectionFlow: "alternatives",
     claimMode: "coupon",
     showArtwork: true,

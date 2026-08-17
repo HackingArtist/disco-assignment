@@ -1,129 +1,13 @@
 import { NextResponse } from "next/server";
-import { isValidHex, type GoogleFont, type WidgetTheme } from "@/lib/widget-config";
+import {
+  extractThemeJsonContent,
+  parseExtractedTheme,
+  THEME_EXTRACTION_PROMPT,
+  type ExtractedTheme,
+} from "@/lib/theme-extraction";
 
-const GOOGLE_FONTS: GoogleFont[] = [
-  "cormorant-garamond",
-  "dm-sans",
-  "fraunces",
-  "space-grotesk",
-];
-const HEADING_WEIGHTS = new Set([400, 500, 600, 700]);
-const BODY_WEIGHTS = new Set([300, 400, 500, 600, 700]);
 const OPENAI_MODEL = process.env.EXTRACT_THEME_MODEL ?? "gpt-4o-mini";
 const ANTHROPIC_MODEL = process.env.EXTRACT_THEME_MODEL ?? "claude-sonnet-4-5";
-
-const COLOR_ROLES = [
-  "page",
-  "surface",
-  "softSurface",
-  "text",
-  "mutedText",
-  "primary",
-  "primaryText",
-  "accent",
-  "border",
-] as const;
-
-type ExtractedTheme = Partial<
-  Pick<
-    WidgetTheme,
-    | "page"
-    | "surface"
-    | "softSurface"
-    | "text"
-    | "mutedText"
-    | "primary"
-    | "primaryText"
-    | "accent"
-    | "border"
-    | "primaryFont"
-    | "secondaryFont"
-    | "headingFontWeight"
-    | "secondaryFontWeight"
-  >
->;
-
-const SYSTEM_PROMPT = `You are a design-token extractor. You are given a UI screenshot and must describe its design system so another interface can be restyled to match. Analyze the image and return ONLY a valid JSON object with exactly this shape:
-
-{
-  "page": "#rrggbb",
-  "surface": "#rrggbb",
-  "softSurface": "#rrggbb",
-  "text": "#rrggbb",
-  "mutedText": "#rrggbb",
-  "primary": "#rrggbb",
-  "primaryText": "#rrggbb",
-  "accent": "#rrggbb",
-  "border": "#rrggbb",
-  "primaryFont": "cormorant-garamond",
-  "secondaryFont": "dm-sans",
-  "headingFontWeight": 600,
-  "secondaryFontWeight": 400
-}
-
-Color roles:
-- page: the overall page or background color behind everything
-- surface: card, panel, or container background
-- softSurface: subtle secondary surface (secondary buttons, muted fills)
-- text: primary heading and body text color
-- mutedText: secondary or muted text color
-- primary: the dominant brand or action color (primary button)
-- primaryText: the text color used on top of the primary color
-- accent: highlight or accent color
-- border: stroke and divider color
-
-Font choices (match the closest visual style to the UI in the screenshot):
-- cormorant-garamond: refined high-contrast serif, elegant editorial display
-- fraunces: soft, slightly quirky old-style serif, warm editorial display
-- dm-sans: clean geometric sans-serif, modern minimal body
-- space-grotesk: technical, slightly offbeat sans-serif, modern UI body
-
-Rules:
-- Always return every field, with six-digit lowercase hex colors.
-- Sample the actual pixels: prefer exact colors you can see over invented ones.
-- Estimate weights by how bold headings and body text appear in the image.
-- When a role is ambiguous, infer it from the closest related color in the image.
-- Return nothing but the JSON object — no markdown, no commentary.`;
-
-function parseExtractedTheme(raw: unknown): ExtractedTheme {
-  if (!raw || typeof raw !== "object") return {};
-  const source = raw as Record<string, unknown>;
-  const theme: ExtractedTheme = {};
-
-  for (const role of COLOR_ROLES) {
-    const value = typeof source[role] === "string" ? (source[role] as string).trim().toLowerCase() : "";
-    if (isValidHex(value)) theme[role] = value as ExtractedTheme[typeof role];
-  }
-
-  if (typeof source.primaryFont === "string" && GOOGLE_FONTS.includes(source.primaryFont as GoogleFont)) {
-    theme.primaryFont = source.primaryFont as GoogleFont;
-  }
-  if (typeof source.secondaryFont === "string" && GOOGLE_FONTS.includes(source.secondaryFont as GoogleFont)) {
-    theme.secondaryFont = source.secondaryFont as GoogleFont;
-  }
-  if (typeof source.headingFontWeight === "number" && HEADING_WEIGHTS.has(source.headingFontWeight)) {
-    theme.headingFontWeight = source.headingFontWeight;
-  }
-  if (typeof source.secondaryFontWeight === "number" && BODY_WEIGHTS.has(source.secondaryFontWeight)) {
-    theme.secondaryFontWeight = source.secondaryFontWeight;
-  }
-
-  return theme;
-}
-
-function extractJsonContent(content: string): unknown {
-  try {
-    return JSON.parse(content);
-  } catch {
-    const match = /\{[\s\S]*\}/.exec(content);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[0]);
-    } catch {
-      return null;
-    }
-  }
-}
 
 interface LocalCliKeys {
   openai?: string;
@@ -187,7 +71,7 @@ async function callOpenAi(apiKey: string, image: string): Promise<Response> {
       response_format: { type: "json_object" },
       max_tokens: 1200,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: THEME_EXTRACTION_PROMPT },
         {
           role: "user",
           content: [
@@ -213,7 +97,7 @@ async function callOpenAi(apiKey: string, image: string): Promise<Response> {
     choices?: { message?: { content?: string } }[];
   };
   const content = data.choices?.[0]?.message?.content;
-  return themeResponse(content ? parseExtractedTheme(extractJsonContent(content)) : {});
+  return themeResponse(content ? parseExtractedTheme(extractThemeJsonContent(content)) : {});
 }
 
 async function callAnthropic(apiKey: string, image: string): Promise<Response> {
@@ -236,7 +120,7 @@ async function callAnthropic(apiKey: string, image: string): Promise<Response> {
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
       max_tokens: 1200,
-      system: SYSTEM_PROMPT,
+      system: THEME_EXTRACTION_PROMPT,
       messages: [
         {
           role: "user",
@@ -266,7 +150,7 @@ async function callAnthropic(apiKey: string, image: string): Promise<Response> {
     content?: { type?: string; text?: string }[];
   };
   const text = data.content?.find((block) => block.type === "text")?.text;
-  return themeResponse(text ? parseExtractedTheme(extractJsonContent(text)) : {});
+  return themeResponse(text ? parseExtractedTheme(extractThemeJsonContent(text)) : {});
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -280,7 +164,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!openAiKey && !anthropicKey) {
     return NextResponse.json(
       {
-        error: "Theme extraction needs an OPENAI_API_KEY, ANTHROPIC_API_KEY, or local CLI authentication (codex/openai/claude). Configure one, then try again.",
+        error: "Theme extraction needs an OPENAI_API_KEY or ANTHROPIC_API_KEY in this environment. Local development can also use an authenticated Codex CLI.",
       },
       { status: 501 },
     );
