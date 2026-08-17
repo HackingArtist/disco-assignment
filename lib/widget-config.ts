@@ -159,9 +159,9 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
   },
   primaryOffer: {
     id: "morrow",
-    partnerName: "Morrow",
+    partnerName: "45 degrees",
     headline: "Your order unlocked a 1 month free trial.",
-    introduction: "Morrow’s premium trekking club membership. Join the group of elite adventurers every month for exclusive experiences.",
+    introduction: "45 Degrees' premium trekking club membership. Join the group of elite adventurers every month for exclusive experiences.",
     title: "Your Morrow bottle benefit",
     detail: "Premium trekking club membership · 1 month free trial",
     expiry: "Your perk is available for the next 24 hours",
