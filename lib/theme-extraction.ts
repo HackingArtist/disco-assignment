@@ -22,6 +22,7 @@ const COLOR_ROLES = [
   "primaryText",
   "accent",
   "border",
+  "primaryButtonBorder",
   "secondaryButtonBorder",
 ] as const;
 
@@ -30,6 +31,8 @@ type ExtractedThemeKey =
   | "containerRadius"
   | "containerBorderWidth"
   | "buttonRadius"
+  | "secondaryButtonRadius"
+  | "primaryButtonBorderWidth"
   | "secondaryButtonBorderWidth"
   | "primaryFont"
   | "secondaryFont"
@@ -50,10 +53,13 @@ export const THEME_EXTRACTION_PROMPT = `You are a design-token extractor. Analyz
   "primaryText": "#rrggbb",
   "accent": "#rrggbb",
   "border": "#rrggbb",
+  "primaryButtonBorder": "#rrggbb",
   "secondaryButtonBorder": "#rrggbb",
   "containerRadius": 12,
   "containerBorderWidth": 1,
   "buttonRadius": 8,
+  "secondaryButtonRadius": 8,
+  "primaryButtonBorderWidth": 1,
   "secondaryButtonBorderWidth": 1,
   "primaryFont": "cormorant-garamond",
   "secondaryFont": "dm-sans",
@@ -71,12 +77,15 @@ Color roles:
 - primaryText: text used on top of the primary color
 - accent: highlight or accent color
 - border: container strokes and structural dividers
+- primaryButtonBorder: the outline color used on primary buttons
 - secondaryButtonBorder: the outline color used on secondary buttons
 
 Geometry roles, measured in pixels:
 - containerRadius: corner radius of the outer card or panel only, from 0 to 24
 - containerBorderWidth: visible outer card or panel stroke, from 0 to 4
-- buttonRadius: corner radius of buttons only, from 0 to 24
+- buttonRadius: corner radius of primary buttons only, from 0 to 24
+- secondaryButtonRadius: corner radius of secondary buttons only, from 0 to 24
+- primaryButtonBorderWidth: visible outline of primary buttons only, from 0 to 4; use 0 when the primary button has no outline
 - secondaryButtonBorderWidth: visible outline of secondary buttons only, from 0 to 4; use 0 when the secondary button has no outline
 
 Do not infer container geometry from buttons or button geometry from containers. Ignore radii and strokes on images, logos, icons, dividers, and decorative shapes.
@@ -117,10 +126,14 @@ export function parseExtractedTheme(raw: unknown): ExtractedTheme {
   const containerRadius = normalizeNumber(source.containerRadius, { min: 0, max: 24, step: 2 });
   const containerBorderWidth = normalizeNumber(source.containerBorderWidth, { min: 0, max: 4, step: 1 });
   const buttonRadius = normalizeNumber(source.buttonRadius, { min: 0, max: 24, step: 2 });
+  const secondaryButtonRadius = normalizeNumber(source.secondaryButtonRadius, { min: 0, max: 24, step: 2 });
+  const primaryButtonBorderWidth = normalizeNumber(source.primaryButtonBorderWidth, { min: 0, max: 4, step: 1 });
   const secondaryButtonBorderWidth = normalizeNumber(source.secondaryButtonBorderWidth, { min: 0, max: 4, step: 1 });
   if (containerRadius !== undefined) theme.containerRadius = containerRadius;
   if (containerBorderWidth !== undefined) theme.containerBorderWidth = containerBorderWidth;
   if (buttonRadius !== undefined) theme.buttonRadius = buttonRadius;
+  if (secondaryButtonRadius !== undefined) theme.secondaryButtonRadius = secondaryButtonRadius;
+  if (primaryButtonBorderWidth !== undefined) theme.primaryButtonBorderWidth = primaryButtonBorderWidth;
   if (secondaryButtonBorderWidth !== undefined) theme.secondaryButtonBorderWidth = secondaryButtonBorderWidth;
 
   if (typeof source.primaryFont === "string" && GOOGLE_FONTS.includes(source.primaryFont as GoogleFont)) {

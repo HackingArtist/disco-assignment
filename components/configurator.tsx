@@ -7,10 +7,12 @@ import {
   AlignLeft,
   Braces,
   Check,
+  CodeXml,
   LockKeyhole,
   Maximize2,
   Minimize2,
   Monitor,
+  Plus,
   RotateCcw,
   SlidersHorizontal,
   Smartphone,
@@ -50,8 +52,8 @@ import {
   type PreviewState,
   type WidgetConfiguration,
   type WidgetEvent,
-  type WidgetState,
   type WidgetTheme,
+  widgetStates,
 } from "@/lib/widget-config";
 
 interface ConfigPanelProps {
@@ -66,6 +68,10 @@ interface ChoiceOption<Value extends string> {
   description: string;
   icon: LucideIcon;
 }
+
+const CLAIM_ONLY_STATES = widgetStates.filter(
+  (state) => state === "default" || state === "claimed" || state === "error",
+);
 
 function ChoiceCards<Value extends string>({
   id,
@@ -182,6 +188,110 @@ function ColorField({
   );
 }
 
+function StudioSliderField({
+  id,
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <Field className="studio-field">
+      <div className="studio-field-heading">
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        <span className="studio-count">{value}px</span>
+      </div>
+      <FieldControl>
+        <Slider
+          id={id}
+          min={min}
+          max={max}
+          step={step}
+          value={[Math.min(max, Math.max(min, value))]}
+          onValueChange={(next) => onChange(Array.isArray(next) ? (next[0] ?? 0) : next)}
+        />
+      </FieldControl>
+    </Field>
+  );
+}
+
+interface ButtonCardProps {
+  title: string;
+  idPrefix: string;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  fill: { label: string; value: string; onChange: (value: string) => void };
+  border: { label: string; value: string; onChange: (value: string) => void };
+  radius: { label: string; value: number; onChange: (value: number) => void };
+  stroke: { label: string; value: number; onChange: (value: number) => void };
+  css: string;
+  onCssChange: (value: string) => void;
+  cssPlaceholder: string;
+}
+
+function ButtonCard({
+  title,
+  idPrefix,
+  expanded,
+  onToggleExpanded,
+  fill,
+  border,
+  radius,
+  stroke,
+  css,
+  onCssChange,
+  cssPlaceholder,
+}: ButtonCardProps) {
+  const hasCustomCss = Boolean(css.trim());
+  return (
+    <section className="studio-button-component">
+      <div className="studio-button-component-header">
+        <h4>{title}</h4>
+        <button
+          type="button"
+          className="studio-button-css-toggle"
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Collapse" : "Expand"} ${title} custom CSS`}
+          onClick={onToggleExpanded}
+        >
+          {hasCustomCss && !expanded && <span className="studio-button-css-badge" aria-hidden="true" />}
+          <span className="studio-button-css-icon" data-visible={!expanded ? "true" : undefined} aria-hidden="true">
+            <Plus />
+          </span>
+          <span className="studio-button-css-icon" data-visible={expanded ? "true" : undefined} aria-hidden="true">
+            <CodeXml />
+          </span>
+        </button>
+      </div>
+      <div className="studio-button-component-controls">
+        <ColorField id={`${idPrefix}-fill`} label={fill.label} value={fill.value} onChange={fill.onChange} />
+        <ColorField id={`${idPrefix}-border`} label={border.label} value={border.value} onChange={border.onChange} />
+        <StudioSliderField id={`${idPrefix}-radius`} label={radius.label} value={radius.value} min={0} max={24} step={2} onChange={radius.onChange} />
+        <StudioSliderField id={`${idPrefix}-stroke`} label={stroke.label} value={stroke.value} min={0} max={4} step={1} onChange={stroke.onChange} />
+      </div>
+      {expanded && (
+        <CssEditor
+          id={`${idPrefix}-css`}
+          label="Custom CSS"
+          value={css}
+          placeholder={cssPlaceholder}
+          onChange={onCssChange}
+        />
+      )}
+    </section>
+  );
+}
+
 function formatCssDeclarations(source: string, indent = ""): string {
   const withSeparatedComments = source.replace(/\/\*[\s\S]*?\*\//g, (comment) => `${comment};`);
   return withSeparatedComments
@@ -212,6 +322,105 @@ function formatButtonCss(source: string): string {
     return `:${match[1]?.toLowerCase()} {\n${declarations}\n}`;
   });
   return [base, ...blocks].filter(Boolean).join("\n\n");
+}
+
+type ButtonKind = "primary" | "secondary";
+
+const BUTTON_CSS_STATE_PATTERN = /(?:&\s*)?:(hover|active|focus-visible|focus|disabled)\s*\{[^{}]*\}/gi;
+
+const BUTTON_THEME_KEYS: Record<
+  ButtonKind,
+  {
+    cssKey: "primaryButtonCss" | "secondaryButtonCss";
+    fillKey: "primary" | "softSurface";
+    borderKey: "primaryButtonBorder" | "secondaryButtonBorder";
+    radiusKey: "buttonRadius" | "secondaryButtonRadius";
+    strokeKey: "primaryButtonBorderWidth" | "secondaryButtonBorderWidth";
+  }
+> = {
+  primary: {
+    cssKey: "primaryButtonCss",
+    fillKey: "primary",
+    borderKey: "primaryButtonBorder",
+    radiusKey: "buttonRadius",
+    strokeKey: "primaryButtonBorderWidth",
+  },
+  secondary: {
+    cssKey: "secondaryButtonCss",
+    fillKey: "softSurface",
+    borderKey: "secondaryButtonBorder",
+    radiusKey: "secondaryButtonRadius",
+    strokeKey: "secondaryButtonBorderWidth",
+  },
+};
+
+const PRIMARY_BUTTON_CSS_PLACEHOLDER = `--button-bg: #253a2a;\nbackground: var(--button-bg);\nborder-radius: 12px;\n:hover {\n  filter: brightness(.9);\n}`;
+const SECONDARY_BUTTON_CSS_PLACEHOLDER = `background: transparent;\nborder: 1px solid currentColor;\n:hover {\n  background: rgba(0, 0, 0, .06);\n}`;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function splitButtonCssStates(source: string): { base: string; states: string[] } {
+  const states: string[] = [];
+  const base = source.replace(BUTTON_CSS_STATE_PATTERN, (match) => {
+    states.push(match);
+    return `\u0000${states.length - 1}\u0000`;
+  });
+  return { base, states };
+}
+
+function restoreButtonCssStates(base: string, states: string[]): string {
+  return states.reduce((acc, state, index) => acc.replace(`\u0000${index}\u0000`, state), base);
+}
+
+function readOwnedCssDeclaration(source: string, property: string): string | null {
+  if (!source.trim()) return null;
+  const { base } = splitButtonCssStates(source);
+  const match = new RegExp(`^\\s*${escapeRegExp(property)}\\s*:\\s*([^;\\n]+);?`, "im").exec(base);
+  const value = match?.[1]?.trim();
+  return value || null;
+}
+
+function syncOwnedCssDeclaration(source: string, property: string, value: string): string {
+  const { base, states } = splitButtonCssStates(source);
+  const linePattern = new RegExp(`^(\\s*${escapeRegExp(property)}\\s*:\\s*)[^;\\n]*;?`, "im");
+  let nextBase: string;
+  if (linePattern.test(base)) {
+    nextBase = base.replace(linePattern, (_line, prefix: string) => `${prefix}${value};`);
+  } else {
+    const firstState = base.indexOf("\u0000");
+    const insertionPoint = firstState >= 0 ? firstState : base.length;
+    const before = base.slice(0, insertionPoint);
+    const after = base.slice(insertionPoint);
+    const leadingBreak = before && !before.endsWith("\n") ? "\n" : "";
+    const trailingBreak = after && !after.startsWith("\n") ? "\n" : "";
+    nextBase = `${before}${leadingBreak}${property}: ${value};${trailingBreak}${after}`;
+  }
+  return restoreButtonCssStates(nextBase, states);
+}
+
+function ownedCssHex(source: string, property: string, fallback: string): string {
+  const raw = readOwnedCssDeclaration(source, property);
+  return raw && isValidHex(raw) ? raw : fallback;
+}
+
+function ownedCssPx(source: string, property: string, fallback: number): number {
+  const raw = readOwnedCssDeclaration(source, property);
+  const match = /^(\d*\.?\d+)(?:px)?$/.exec(raw?.trim() ?? "");
+  if (!match) return fallback;
+  const number = Number(match[1]);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function buildButtonCssPrefill(theme: WidgetTheme, kind: ButtonKind): string {
+  const keys = BUTTON_THEME_KEYS[kind];
+  return [
+    `background: ${theme[keys.fillKey]};`,
+    `border-color: ${theme[keys.borderKey]};`,
+    `border-radius: ${theme[keys.radiusKey]}px;`,
+    `border-width: ${theme[keys.strokeKey]}px;`,
+  ].join("\n");
 }
 
 function highlightCssValue(value: string, lineIndex: number): ReactNode[] {
@@ -432,7 +641,7 @@ function ThemeFromImage({
       const bodyLabel = patch.secondaryFont ? googleFontLabels[patch.secondaryFont] : "";
       setPending({
         patch,
-        colors: [patch.page, patch.surface, patch.softSurface, patch.text, patch.primary, patch.accent, patch.border, patch.secondaryButtonBorder]
+        colors: [patch.page, patch.surface, patch.softSurface, patch.text, patch.primary, patch.accent, patch.border, patch.primaryButtonBorder, patch.secondaryButtonBorder]
           .filter((color): color is string => Boolean(color)),
         fonts: [headingLabel, bodyLabel].filter(Boolean).join(" + "),
       });
@@ -574,6 +783,10 @@ function SwitchRow({
 }
 
 function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
+  const [expandedButtonCss, setExpandedButtonCss] = useState<Record<ButtonKind, boolean>>({
+    primary: false,
+    secondary: false,
+  });
   const updateTheme = <Key extends keyof WidgetConfiguration["theme"]>(
     key: Key,
     value: WidgetConfiguration["theme"][Key],
@@ -588,6 +801,35 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
     ...current,
     behavior: { ...current.behavior, [key]: value },
   }));
+  const updateButtonVisual = <Key extends keyof WidgetTheme>(
+    kind: ButtonKind,
+    tokenKey: Key,
+    cssProperty: string,
+    value: WidgetTheme[Key],
+  ) => setConfig((current) => {
+    const theme = { ...current.theme };
+    theme[tokenKey] = value;
+    const cssKey = BUTTON_THEME_KEYS[kind].cssKey;
+    const css = theme[cssKey];
+    if (css.trim()) {
+      theme[cssKey] = syncOwnedCssDeclaration(css, cssProperty, typeof value === "number" ? `${value}px` : value);
+    }
+    return { ...current, theme };
+  });
+  const toggleButtonCss = (kind: ButtonKind) => {
+    const expanding = !expandedButtonCss[kind];
+    setExpandedButtonCss((current) => ({ ...current, [kind]: expanding }));
+    if (expanding) {
+      setConfig((current) => {
+        const cssKey = BUTTON_THEME_KEYS[kind].cssKey;
+        if (current.theme[cssKey].trim()) return current;
+        return {
+          ...current,
+          theme: { ...current.theme, [cssKey]: buildButtonCssPrefill(current.theme, kind) },
+        };
+      });
+    }
+  };
   const applyThemePatch = (patch: Partial<WidgetTheme>) => {
     setConfig((current) => ({ ...current, theme: { ...current.theme, ...patch } }));
   };
@@ -773,24 +1015,24 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
             <div className="studio-theme-grid">
               <ColorField id={`${idPrefix}-surface`} label="Background" value={config.theme.surface} onChange={(value) => updateTheme("surface", value)} />
               <ColorField id={`${idPrefix}-border`} label="Container Border" value={config.theme.border} onChange={(value) => updateTheme("border", value)} />
-              <Field className="studio-field">
-                <div className="studio-field-heading">
-                  <FieldLabel htmlFor={`${idPrefix}-container-radius`}>Container radius</FieldLabel>
-                  <span className="studio-count">{config.theme.containerRadius}px</span>
-                </div>
-                <FieldControl>
-                  <Slider id={`${idPrefix}-container-radius`} min={0} max={24} step={2} value={[config.theme.containerRadius]} onValueChange={(value) => updateTheme("containerRadius", Array.isArray(value) ? (value[0] ?? 0) : value)} />
-                </FieldControl>
-              </Field>
-              <Field className="studio-field">
-                <div className="studio-field-heading">
-                  <FieldLabel htmlFor={`${idPrefix}-container-stroke-width`}>Container stroke</FieldLabel>
-                  <span className="studio-count">{config.theme.containerBorderWidth}px</span>
-                </div>
-                <FieldControl>
-                  <Slider id={`${idPrefix}-container-stroke-width`} min={0} max={4} step={1} value={[config.theme.containerBorderWidth]} onValueChange={(value) => updateTheme("containerBorderWidth", Array.isArray(value) ? (value[0] ?? 0) : value)} />
-                </FieldControl>
-              </Field>
+              <StudioSliderField
+                id={`${idPrefix}-container-radius`}
+                label="Container radius"
+                value={config.theme.containerRadius}
+                min={0}
+                max={24}
+                step={2}
+                onChange={(value) => updateTheme("containerRadius", value)}
+              />
+              <StudioSliderField
+                id={`${idPrefix}-container-stroke-width`}
+                label="Container stroke"
+                value={config.theme.containerBorderWidth}
+                min={0}
+                max={4}
+                step={1}
+                onChange={(value) => updateTheme("containerBorderWidth", value)}
+              />
             </div>
           </section>
 
@@ -798,28 +1040,65 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
             <div className="studio-theme-group-heading">
               <h3 id={`${idPrefix}-buttons`}>Buttons</h3>
             </div>
-            <div className="studio-theme-grid">
-              <ColorField id={`${idPrefix}-primary`} label="Primary Button" value={config.theme.primary} onChange={(value) => updateTheme("primary", value)} />
-              <ColorField id={`${idPrefix}-soft-surface`} label="Secondary Button" value={config.theme.softSurface} onChange={(value) => updateTheme("softSurface", value)} />
-              <ColorField id={`${idPrefix}-secondary-button-border`} label="Secondary Border" value={config.theme.secondaryButtonBorder} onChange={(value) => updateTheme("secondaryButtonBorder", value)} />
-              <Field className="studio-field">
-                <div className="studio-field-heading">
-                  <FieldLabel htmlFor={`${idPrefix}-button-radius`}>Button radius</FieldLabel>
-                  <span className="studio-count">{config.theme.buttonRadius}px</span>
-                </div>
-                <FieldControl>
-                  <Slider id={`${idPrefix}-button-radius`} min={0} max={24} step={2} value={[config.theme.buttonRadius]} onValueChange={(value) => updateTheme("buttonRadius", Array.isArray(value) ? (value[0] ?? 0) : value)} />
-                </FieldControl>
-              </Field>
-              <Field className="studio-field">
-                <div className="studio-field-heading">
-                  <FieldLabel htmlFor={`${idPrefix}-secondary-button-stroke-width`}>Secondary stroke</FieldLabel>
-                  <span className="studio-count">{config.theme.secondaryButtonBorderWidth}px</span>
-                </div>
-                <FieldControl>
-                  <Slider id={`${idPrefix}-secondary-button-stroke-width`} min={0} max={4} step={1} value={[config.theme.secondaryButtonBorderWidth]} onValueChange={(value) => updateTheme("secondaryButtonBorderWidth", Array.isArray(value) ? (value[0] ?? 0) : value)} />
-                </FieldControl>
-              </Field>
+            <div className="studio-button-components">
+              <ButtonCard
+                title="Primary Button"
+                idPrefix={`${idPrefix}-primary-button`}
+                expanded={expandedButtonCss.primary}
+                onToggleExpanded={() => toggleButtonCss("primary")}
+                fill={{
+                  label: "Fill",
+                  value: ownedCssHex(config.theme.primaryButtonCss, "background", config.theme.primary),
+                  onChange: (value) => updateButtonVisual("primary", "primary", "background", value),
+                }}
+                border={{
+                  label: "Border color",
+                  value: ownedCssHex(config.theme.primaryButtonCss, "border-color", config.theme.primaryButtonBorder),
+                  onChange: (value) => updateButtonVisual("primary", "primaryButtonBorder", "border-color", value),
+                }}
+                radius={{
+                  label: "Radius",
+                  value: ownedCssPx(config.theme.primaryButtonCss, "border-radius", config.theme.buttonRadius),
+                  onChange: (value) => updateButtonVisual("primary", "buttonRadius", "border-radius", value),
+                }}
+                stroke={{
+                  label: "Stroke",
+                  value: ownedCssPx(config.theme.primaryButtonCss, "border-width", config.theme.primaryButtonBorderWidth),
+                  onChange: (value) => updateButtonVisual("primary", "primaryButtonBorderWidth", "border-width", value),
+                }}
+                css={config.theme.primaryButtonCss}
+                onCssChange={(value) => updateTheme("primaryButtonCss", value)}
+                cssPlaceholder={PRIMARY_BUTTON_CSS_PLACEHOLDER}
+              />
+              <ButtonCard
+                title="Secondary Button"
+                idPrefix={`${idPrefix}-secondary-button`}
+                expanded={expandedButtonCss.secondary}
+                onToggleExpanded={() => toggleButtonCss("secondary")}
+                fill={{
+                  label: "Fill",
+                  value: ownedCssHex(config.theme.secondaryButtonCss, "background", config.theme.softSurface),
+                  onChange: (value) => updateButtonVisual("secondary", "softSurface", "background", value),
+                }}
+                border={{
+                  label: "Border color",
+                  value: ownedCssHex(config.theme.secondaryButtonCss, "border-color", config.theme.secondaryButtonBorder),
+                  onChange: (value) => updateButtonVisual("secondary", "secondaryButtonBorder", "border-color", value),
+                }}
+                radius={{
+                  label: "Radius",
+                  value: ownedCssPx(config.theme.secondaryButtonCss, "border-radius", config.theme.secondaryButtonRadius),
+                  onChange: (value) => updateButtonVisual("secondary", "secondaryButtonRadius", "border-radius", value),
+                }}
+                stroke={{
+                  label: "Stroke",
+                  value: ownedCssPx(config.theme.secondaryButtonCss, "border-width", config.theme.secondaryButtonBorderWidth),
+                  onChange: (value) => updateButtonVisual("secondary", "secondaryButtonBorderWidth", "border-width", value),
+                }}
+                css={config.theme.secondaryButtonCss}
+                onCssChange={(value) => updateTheme("secondaryButtonCss", value)}
+                cssPlaceholder={SECONDARY_BUTTON_CSS_PLACEHOLDER}
+              />
             </div>
           </section>
         </div>
@@ -833,29 +1112,27 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
             </AlertDescription>
           </Alert>
         )}
-        <Separator />
-        <SectionHeading title="Custom button CSS" />
-        <div className="studio-field-stack">
-          <CssEditor
-            id={`${idPrefix}-primary-button-css`}
-            label="Primary button CSS"
-            value={config.theme.primaryButtonCss}
-            placeholder={`--button-bg: #253a2a;\nbackground: var(--button-bg);\nborder-radius: 12px;\n:hover {\n  filter: brightness(.9);\n}`}
-            onChange={(value) => updateTheme("primaryButtonCss", value)}
-          />
-          <CssEditor
-            id={`${idPrefix}-secondary-button-css`}
-            label="Secondary button CSS"
-            value={config.theme.secondaryButtonCss}
-            placeholder={`background: transparent;\nborder: 1px solid currentColor;\n:hover {\n  background: rgba(0, 0, 0, .06);\n}`}
-            onChange={(value) => updateTheme("secondaryButtonCss", value)}
-          />
-        </div>
       </TabsContent>
 
       <TabsContent value="behavior" className="studio-tab-content">
         <SectionHeading title="Widget behavior" />
         <div className="studio-field-stack">
+          <Field className="studio-field">
+            <div className="studio-field-heading">
+              <FieldLabel htmlFor={`${idPrefix}-experiment`}>Experiments</FieldLabel>
+            </div>
+            <FieldControl>
+              <Select value={config.behavior.experiment} onValueChange={(value) => updateBehavior("experiment", value as WidgetConfiguration["behavior"]["experiment"])}>
+                <SelectTrigger id={`${idPrefix}-experiment`} className="studio-select-trigger"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="claim-only">Single offer · Claim only</SelectItem>
+                  <SelectItem value="claim-and-not-for-me">Single offer · Claim + Not for me</SelectItem>
+                  <SelectItem value="both">View both</SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldControl>
+          </Field>
+          <Separator />
           <Field className="studio-field">
             <div className="studio-field-heading">
               <FieldLabel htmlFor={`${idPrefix}-rejection`}>After rejection</FieldLabel>
@@ -950,13 +1227,19 @@ export default function Configurator() {
   const [previewState, setPreviewState] = useState<PreviewState>("all");
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>("desktop");
   const [events, setEvents] = useState<WidgetEvent[]>(["widget_viewed"]);
+  const availableStates = config.behavior.experiment === "claim-only"
+    ? CLAIM_ONLY_STATES
+    : widgetStates;
   const stateOptions = useMemo(
     () => [
       { value: "all", label: "All states" },
-      ...(Object.entries(widgetStateLabels) as [WidgetState, string][]).map(([value, label]) => ({ value, label })),
+      ...availableStates.map((value) => ({ value, label: widgetStateLabels[value] })),
     ],
-    [],
+    [availableStates],
   );
+  const effectivePreviewState = previewState === "all" || availableStates.includes(previewState)
+    ? previewState
+    : "default";
 
   useEffect(() => {
     if (!window.matchMedia("(max-width: 620px)").matches) return;
@@ -1068,7 +1351,7 @@ export default function Configurator() {
               </div>
               <PreviewSelect
                 label="State"
-                value={previewState}
+                value={effectivePreviewState}
                 onValueChange={(value) => choosePreviewState(value as PreviewState)}
                 options={stateOptions}
               />
@@ -1076,11 +1359,11 @@ export default function Configurator() {
           </div>
 
           <div className="preview-stage">
-            <Card className={`preview-frame preview-frame-${previewViewport}${previewState === "all" ? " preview-frame-all" : ""}`}>
+            <Card className={`preview-frame preview-frame-${previewViewport}${effectivePreviewState === "all" ? " preview-frame-all" : ""}`}>
               <CardContent className="preview-frame-content">
                 <PreviewCanvas
                   config={config}
-                  state={previewState}
+                  state={effectivePreviewState}
                   onStateChange={setPreviewState}
                   onEvent={track}
                   viewport={previewViewport}

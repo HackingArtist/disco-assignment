@@ -1,6 +1,5 @@
 export type WidgetState =
   | "default"
-  | "loading"
   | "recovery"
   | "claimed"
   | "error"
@@ -12,6 +11,7 @@ export type PreviewState = WidgetState | "all";
 export type WidgetDensity = "compact" | "roomy";
 export type WidgetAlignment = "left" | "center";
 export type PreviewViewport = "desktop" | "mobile";
+export type WidgetExperiment = "claim-only" | "claim-and-not-for-me" | "both";
 export type GoogleFont = "cormorant-garamond" | "dm-sans" | "fraunces" | "space-grotesk";
 export type ArtworkKind = "bottle" | "journal" | "socks";
 
@@ -48,10 +48,13 @@ export interface WidgetTheme {
   primaryText: string;
   accent: string;
   border: string;
+  primaryButtonBorder: string;
   secondaryButtonBorder: string;
   containerRadius: number;
   containerBorderWidth: number;
   buttonRadius: number;
+  secondaryButtonRadius: number;
+  primaryButtonBorderWidth: number;
   secondaryButtonBorderWidth: number;
   primaryFont: GoogleFont;
   secondaryFont: GoogleFont;
@@ -78,6 +81,7 @@ export interface OfferConfig {
 }
 
 export interface WidgetBehavior {
+  experiment: WidgetExperiment;
   density: WidgetDensity;
   alignment: WidgetAlignment;
   rejectionFlow: "alternatives" | "dismiss";
@@ -98,7 +102,6 @@ export interface WidgetConfiguration {
 
 export const widgetStateLabels: Record<WidgetState, string> = {
   default: "Best match",
-  loading: "Finding matches",
   recovery: "Alternatives",
   claimed: "Claimed",
   error: "Error",
@@ -143,10 +146,13 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     primaryText: "#fffdf9",
     accent: "#d39c72",
     border: "#d8d3c9",
+    primaryButtonBorder: "#253a2a",
     secondaryButtonBorder: "#d8d3c9",
     containerRadius: 0,
     containerBorderWidth: 0,
     buttonRadius: 0,
+    secondaryButtonRadius: 0,
+    primaryButtonBorderWidth: 0,
     secondaryButtonBorderWidth: 0,
     primaryFont: "cormorant-garamond",
     secondaryFont: "dm-sans",
@@ -214,6 +220,7 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     },
   ],
   behavior: {
+    experiment: "claim-and-not-for-me",
     density: "compact",
     alignment: "left",
     rejectionFlow: "alternatives",

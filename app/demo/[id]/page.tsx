@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { DemoTwoOffer } from "@/components/demo-two-offer";
 
 const demos = {
   "1": {
@@ -6,7 +7,7 @@ const demos = {
     title: "Harvest order confirmation",
   },
   "2": {
-    src: "/demo/2.html",
+    src: "/demo/2-source.html",
     title: "H34W order confirmation",
   },
 } as const;
@@ -25,7 +26,9 @@ export default async function DemoPage({
     notFound();
   }
 
-  const isZoomedOut = id === "2";
+  if (id === "2") {
+    return <DemoTwoOffer />;
+  }
 
   return (
     <iframe
@@ -34,11 +37,11 @@ export default async function DemoPage({
       style={{
         position: "fixed",
         inset: 0,
-        width: isZoomedOut ? "111.111%" : "100%",
-        height: isZoomedOut ? "111.111%" : "100%",
+        width: "100%",
+        height: "100%",
         border: 0,
         background: "white",
-        transform: isZoomedOut ? "scale(0.9)" : undefined,
+        transform: undefined,
         transformOrigin: "top left",
       }}
     />

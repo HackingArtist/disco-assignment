@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useMemo, useState, type CSSProperties } from "react";
 
 import {
   googleFontVariables,
@@ -10,6 +10,7 @@ import {
   type PreviewViewport,
   type WidgetConfiguration,
   type WidgetEvent,
+  type WidgetExperiment,
   type WidgetState,
   widgetStateLabels,
   widgetStates,
@@ -19,6 +20,7 @@ type ThemeProperties = CSSProperties & Record<`--ow-${string}`, string>;
 
 interface OfferWidgetProps {
   config: WidgetConfiguration;
+  experiment: Exclude<WidgetExperiment, "both">;
   state: WidgetState;
   onStateChange: (state: WidgetState) => void;
   onEvent: (event: WidgetEvent) => void;
@@ -146,20 +148,26 @@ function WidgetFooter({ config }: { config: WidgetConfiguration }) {
           <span className="ow-powered-by-name">{config.merchant.name}</span>
         )}
       </p>
-      {config.behavior.showDisclosure && <p className="ow-disclosure">{config.disclosure}</p>}
+      {config.behavior.showDisclosure && (
+        <p className="ow-disclosure">
+          <span className="ow-desktop-copy">{config.disclosure}</span>
+          <span className="ow-mobile-copy">Benefit unlocked by your Order</span>
+        </p>
+      )}
     </footer>
   );
 }
 
 export function OfferWidget({
   config,
+  experiment,
   state,
   onStateChange,
   onEvent,
 }: OfferWidgetProps) {
+  const showsRejection = experiment === "claim-and-not-for-me";
   const [claimedOfferId, setClaimedOfferId] = useState(config.primaryOffer.id);
   const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allOffers = useMemo(
     () => [config.primaryOffer, ...config.alternativeOffers],
     [config.primaryOffer, config.alternativeOffers],
@@ -167,12 +175,7 @@ export function OfferWidget({
   const claimedOffer =
     allOffers.find((offer) => offer.id === claimedOfferId) ?? config.primaryOffer;
 
-  useEffect(() => () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
-
   const moveTo = (nextState: WidgetState) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
     setCopied(false);
     onStateChange(nextState);
   };
@@ -183,11 +186,8 @@ export function OfferWidget({
       moveTo("exit");
       return;
     }
-    moveTo("loading");
-    timerRef.current = setTimeout(() => {
-      onStateChange("recovery");
-      onEvent("alternatives_viewed");
-    }, 650);
+    moveTo("recovery");
+    onEvent("alternatives_viewed");
   };
 
   const claim = (offer: OfferConfig) => {
@@ -211,43 +211,23 @@ export function OfferWidget({
       {state === "default" && (
         <section className="ow-panel ow-primary-offer">
           <div className="ow-offer-intro">
-            <h2>{config.primaryOffer.headline}</h2>
-            <p>{config.primaryOffer.introduction}</p>
+            <h2>
+              <span className="ow-desktop-copy">{config.primaryOffer.headline}</span>
+              <span className="ow-mobile-copy">You unlocked free trial</span>
+            </h2>
+            <div className="ow-offer-summary">
+              {config.behavior.showArtwork && <OfferArtwork asset={config.primaryOffer.image} />}
+              <p>{config.primaryOffer.introduction}</p>
+            </div>
           </div>
-          {config.behavior.showArtwork && <OfferArtwork asset={config.primaryOffer.image} />}
           {config.behavior.showExpiry && (
             <p className="ow-expiry">{config.primaryOffer.expiry}</p>
           )}
-          <div className="ow-offer-actions">
+          <div className={`ow-offer-actions${showsRejection ? "" : " ow-offer-actions-single"}`}>
             <button className="ow-button ow-button-primary" type="button" onClick={() => claim(config.primaryOffer)}>
               {config.primaryOffer.claimLabel}
             </button>
-            <button className="ow-button ow-button-quiet" type="button" onClick={reject}>No, thanks</button>
-          </div>
-          <WidgetFooter config={config} />
-        </section>
-      )}
-
-      {state === "loading" && (
-        <section className="ow-panel ow-status-panel ow-loading-panel" aria-live="polite" aria-busy="true">
-          <div className="ow-status-content">
-            <div className="ow-loading-mark" aria-hidden="true">
-              <svg viewBox="0 0 52 32" focusable="false">
-                <path
-                  className="ow-infinity-track"
-                  pathLength="100"
-                  d="M26 16C20 8 16 5 11 5C4 5 1 10 1 16C1 22 4 27 11 27C16 27 20 24 26 16C32 8 36 5 41 5C48 5 51 10 51 16C51 22 48 27 41 27C36 27 32 24 26 16Z"
-                />
-                <path
-                  className="ow-infinity-runner"
-                  pathLength="100"
-                  d="M26 16C20 8 16 5 11 5C4 5 1 10 1 16C1 22 4 27 11 27C16 27 20 24 26 16C32 8 36 5 41 5C48 5 51 10 51 16C51 22 48 27 41 27C36 27 32 24 26 16Z"
-                />
-              </svg>
-            </div>
-            <h2>Checking your other unlocked perks…</h2>
-            <p>These benefits come with your order.</p>
-            <div className="ow-loading-lines"><i /><i /><i /></div>
+            {showsRejection && <button className="ow-button ow-button-quiet" type="button" onClick={reject}>Not for me</button>}
           </div>
           <WidgetFooter config={config} />
         </section>
@@ -256,7 +236,10 @@ export function OfferWidget({
       {state === "recovery" && (
         <section className="ow-recovery" aria-live="polite">
           <div className="ow-recovery-heading">
-            <h2>Choose one perk to claim.</h2>
+            <h2>
+              <span className="ow-desktop-copy">You can unlock one of these instead.</span>
+              <span className="ow-mobile-copy">Unlock one of these instead.</span>
+            </h2>
             <button type="button" onClick={() => {
               moveTo("exit");
               onEvent("alternatives_rejected");
@@ -306,11 +289,10 @@ export function OfferWidget({
       {state === "error" && (
         <section className="ow-panel ow-status-panel ow-error-panel" aria-live="polite">
           <div className="ow-status-content">
-            <span className="ow-status-icon">↻</span>
             <h2>That didn&apos;t work.</h2>
             <p>Your order is safe. Want to try again?</p>
             <div className="ow-status-actions">
-              <button className="ow-button ow-button-primary" type="button" onClick={reject}>Try again</button>
+              <button className="ow-button ow-button-primary" type="button" onClick={() => moveTo("default")}>Try again</button>
               <button className="ow-button ow-button-quiet" type="button" onClick={() => moveTo("exit")}>No thanks</button>
             </div>
           </div>
@@ -321,7 +303,6 @@ export function OfferWidget({
       {state === "empty" && (
         <section className="ow-panel ow-status-panel ow-empty-panel" aria-live="polite">
           <div className="ow-status-content">
-            <span className="ow-status-icon">✦</span>
             <h2>Nothing else for now.</h2>
             <p>Enjoy your new runners.</p>
             <button className="ow-button ow-button-quiet" type="button" onClick={() => moveTo("default")}>Return to order</button>
@@ -333,7 +314,6 @@ export function OfferWidget({
       {state === "exit" && (
         <section className="ow-panel ow-status-panel ow-exit-panel" aria-live="polite">
           <div className="ow-status-content">
-            <span className="ow-status-icon">✓</span>
             <h2>Enjoy your order.</h2>
             <p>Thanks for letting us know.</p>
             <button className="ow-button ow-button-quiet" type="button" onClick={() => moveTo("default")}>Undo</button>
@@ -366,10 +346,13 @@ export function PreviewCanvas({
     "--ow-primary-text": config.theme.primaryText,
     "--ow-accent": config.theme.accent,
     "--ow-border": config.theme.border,
+    "--ow-primary-button-border": config.theme.primaryButtonBorder,
     "--ow-secondary-button-border": config.theme.secondaryButtonBorder,
     "--ow-container-radius": `${config.theme.containerRadius}px`,
     "--ow-container-stroke-width": `${config.theme.containerBorderWidth}px`,
     "--ow-button-radius": `${config.theme.buttonRadius}px`,
+    "--ow-secondary-button-radius": `${config.theme.secondaryButtonRadius}px`,
+    "--ow-primary-button-stroke-width": `${config.theme.primaryButtonBorderWidth}px`,
     "--ow-secondary-button-stroke-width": `${config.theme.secondaryButtonBorderWidth}px`,
     "--ow-display-font": googleFontVariables[config.theme.primaryFont],
     "--ow-body-font": googleFontVariables[config.theme.secondaryFont],
@@ -378,14 +361,25 @@ export function PreviewCanvas({
     "--ow-body-size": normalizeCssSize(config.theme.secondaryFontSize, "14px"),
     "--ow-body-weight": String(config.theme.secondaryFontWeight),
   };
-  const renderWidget = (widgetState: WidgetState) => (
+  const renderWidget = (widgetState: WidgetState, experiment: Exclude<WidgetExperiment, "both">) => (
     <OfferWidget
       config={config}
+      experiment={experiment}
       state={widgetState}
       onStateChange={onStateChange}
       onEvent={onEvent}
     />
   );
+  const experiments: Exclude<WidgetExperiment, "both">[] = config.behavior.experiment === "both"
+    ? ["claim-only", "claim-and-not-for-me"]
+    : [config.behavior.experiment];
+  const experimentLabels: Record<Exclude<WidgetExperiment, "both">, string> = {
+    "claim-only": "Single offer · Claim only",
+    "claim-and-not-for-me": "Single offer · Claim + Not for me",
+  };
+  const statesForExperiment = (experiment: Exclude<WidgetExperiment, "both">) => experiment === "claim-only"
+    ? widgetStates.filter((widgetState) => widgetState === "default" || widgetState === "claimed" || widgetState === "error")
+    : widgetStates;
 
   return (
     <div
@@ -394,18 +388,27 @@ export function PreviewCanvas({
       data-testid="preview-document"
     >
       {customButtonCss && <style>{customButtonCss}</style>}
-      {state === "all" ? (
-        <div className="preview-state-canvas" aria-label="All widget states">
-          {widgetStates.map((widgetState) => (
-            <figure className="preview-state-item" key={widgetState} aria-label={`${widgetStateLabels[widgetState]} state`}>
-              <div className="widget-isolated-stage">{renderWidget(widgetState)}</div>
-              <figcaption>{widgetStateLabels[widgetState]}</figcaption>
-            </figure>
-          ))}
-        </div>
-      ) : (
-        <div className="widget-isolated-stage">{renderWidget(state)}</div>
-      )}
+      <div className={`preview-experiment-stack${experiments.length > 1 ? " preview-experiment-stack-both" : ""}`}>
+        {experiments.map((experiment) => (
+          <section className="preview-experiment-group" key={experiment} aria-label={experimentLabels[experiment]}>
+            {experiments.length > 1 && <h2 className="preview-experiment-label">{experimentLabels[experiment]}</h2>}
+            {state === "all" ? (
+              <div className="preview-state-canvas" aria-label={`All widget states for ${experimentLabels[experiment]}`}>
+                {statesForExperiment(experiment).map((widgetState) => (
+                  <figure className="preview-state-item" key={widgetState} aria-label={`${widgetStateLabels[widgetState]} state`}>
+                    <div className="widget-isolated-stage">{renderWidget(widgetState, experiment)}</div>
+                    <figcaption>{widgetStateLabels[widgetState]}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            ) : (
+              <div className="widget-isolated-stage">
+                {renderWidget(statesForExperiment(experiment).includes(state) ? state : "default", experiment)}
+              </div>
+            )}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
