@@ -1,15 +1,17 @@
 export type WidgetState =
   | "default"
-  | "loading"
   | "recovery"
   | "claimed"
   | "error"
   | "empty"
   | "exit";
 
+export type PreviewState = WidgetState | "all";
+
 export type WidgetDensity = "compact" | "roomy";
-export type PreviewContext = "context" | "isolated";
+export type WidgetAlignment = "left" | "center";
 export type PreviewViewport = "desktop" | "mobile";
+export type WidgetExperiment = "claim-only" | "claim-and-not-for-me" | "both";
 export type GoogleFont = "cormorant-garamond" | "dm-sans" | "fraunces" | "space-grotesk";
 export type ArtworkKind = "bottle" | "journal" | "socks";
 
@@ -20,7 +22,7 @@ export type WidgetEvent =
   | `offer_claimed:${string}`
   | "alternatives_rejected"
   | "code_copied"
-  | `demo_state:${WidgetState}`;
+  | `demo_state:${PreviewState}`;
 
 export interface AssetReference {
   kind: "fallback" | "url" | "upload";
@@ -32,7 +34,6 @@ export interface AssetReference {
 
 export interface MerchantBrand {
   name: string;
-  wordmark: string;
   contactEmail: string;
   logo: AssetReference;
 }
@@ -47,8 +48,14 @@ export interface WidgetTheme {
   primaryText: string;
   accent: string;
   border: string;
-  radius: number;
-  borderWidth: number;
+  primaryButtonBorder: string;
+  secondaryButtonBorder: string;
+  containerRadius: number;
+  containerBorderWidth: number;
+  buttonRadius: number;
+  secondaryButtonRadius: number;
+  primaryButtonBorderWidth: number;
+  secondaryButtonBorderWidth: number;
   primaryFont: GoogleFont;
   secondaryFont: GoogleFont;
   headingFontSize: string;
@@ -62,7 +69,6 @@ export interface WidgetTheme {
 export interface OfferConfig {
   id: string;
   partnerName: string;
-  eyebrow: string;
   headline: string;
   introduction: string;
   title: string;
@@ -75,7 +81,9 @@ export interface OfferConfig {
 }
 
 export interface WidgetBehavior {
+  experiment: WidgetExperiment;
   density: WidgetDensity;
+  alignment: WidgetAlignment;
   rejectionFlow: "alternatives" | "dismiss";
   claimMode: "coupon" | "email";
   showArtwork: boolean;
@@ -94,13 +102,14 @@ export interface WidgetConfiguration {
 
 export const widgetStateLabels: Record<WidgetState, string> = {
   default: "Best match",
-  loading: "Finding matches",
   recovery: "Alternatives",
   claimed: "Claimed",
   error: "Error",
   empty: "No match",
   exit: "Dismissed",
 };
+
+export const widgetStates = Object.keys(widgetStateLabels) as WidgetState[];
 
 export const googleFontLabels: Record<GoogleFont, string> = {
   "cormorant-garamond": "Cormorant Garamond",
@@ -118,8 +127,7 @@ export const googleFontVariables: Record<GoogleFont, string> = {
 
 export const defaultWidgetConfiguration: WidgetConfiguration = {
   merchant: {
-    name: "Noma",
-    wordmark: "NOMA",
+    name: "Disco Network",
     contactEmail: "hello@noma.example",
     logo: {
       kind: "fallback",
@@ -138,8 +146,14 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     primaryText: "#fffdf9",
     accent: "#d39c72",
     border: "#d8d3c9",
-    radius: 0,
-    borderWidth: 1,
+    primaryButtonBorder: "#253a2a",
+    secondaryButtonBorder: "#d8d3c9",
+    containerRadius: 0,
+    containerBorderWidth: 0,
+    buttonRadius: 0,
+    secondaryButtonRadius: 0,
+    primaryButtonBorderWidth: 0,
+    secondaryButtonBorderWidth: 0,
     primaryFont: "cormorant-garamond",
     secondaryFont: "dm-sans",
     headingFontSize: "36px",
@@ -151,15 +165,14 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
   },
   primaryOffer: {
     id: "morrow",
-    partnerName: "Morrow",
-    eyebrow: "Unlocked with your Noma order",
-    headline: "Your order unlocked a trail perk.",
-    introduction: "You’ve earned $20 toward Morrow’s insulated Ridge bottle.",
+    partnerName: "45 degrees",
+    headline: "Your order unlocked a 1 month free trial.",
+    introduction: "45 Degrees' premium trekking club membership. Join the group of elite adventurers every month for exclusive experiences.",
     title: "Your Morrow bottle benefit",
-    detail: "$20 toward the insulated Ridge bottle · 24 oz",
+    detail: "Premium trekking club membership · 1 month free trial",
     expiry: "Your perk is available for the next 24 hours",
-    claimLabel: "Use my benefit",
-    couponCode: "NOMA20",
+    claimLabel: "Claim now",
+    couponCode: "MORROW20",
     destinationLabel: "Shop Morrow",
     image: {
       kind: "fallback",
@@ -172,11 +185,10 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     {
       id: "field-notes",
       partnerName: "Field Notes",
-      eyebrow: "Another order perk",
       headline: "Your order includes trail notes",
       introduction: "A place for routes, notes, and new ideas.",
-      title: "A trail-ready extra",
-      detail: "Your order unlocks a complimentary 3-pack.",
+      title: "Your order unlocks a complimentary 3-pack ",
+      detail: "Camelin's Field Notes trail journal, perfect for your next adventure.",
       expiry: "Your perk is available for 24 hours",
       claimLabel: "Choose this benefit",
       couponCode: "TRAILSET",
@@ -191,11 +203,10 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     {
       id: "ritual",
       partnerName: "Ritual Goods",
-      eyebrow: "Another order perk",
       headline: "Your order unlocked trail comfort",
       introduction: "A 25% benefit on Ritual Goods merino running socks.",
-      title: "A comfort perk for the trail",
-      detail: "Your order unlocks 25% on soft merino running socks.",
+      title: "Your order unlocks 25% off",
+      detail: "Merino running socks pack of 6, made in the USA.",
       expiry: "Your perk is available for 24 hours",
       claimLabel: "Choose this benefit",
       couponCode: "RITUAL25",
@@ -209,7 +220,9 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     },
   ],
   behavior: {
+    experiment: "claim-and-not-for-me",
     density: "compact",
+    alignment: "left",
     rejectionFlow: "alternatives",
     claimMode: "coupon",
     showArtwork: true,
