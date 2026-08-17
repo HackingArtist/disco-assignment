@@ -1,6 +1,6 @@
 # Disco Offer Studio
 
-This prototype explores a focused post-purchase offer experience for Disco: show one strong recommendation first, give the shopper an easy way to reject it, and offer a small recovery set when the match is wrong.
+This prototype explores post-purchase offer experiences for Disco: through designing experiments around the offer widget and building a highly cutomisable yet user friendly publishing system.
 
 The goal is not to recreate Disco's ranking or attribution systems. It is to make the interaction and the publisher controls concrete enough to test.
 
@@ -35,18 +35,22 @@ npm test
 
 ### 1. Shopper-facing offer widget
 
-The default experience starts with one static, best-match offer and two actions:
+The default experience starts with one static, best-match offer. Building on top of it we introduct an action "Not for me"
 
 - **Claim** — accepts the recommendation.
-- **Not for me** — records a rejection and reveals two alternatives at the same time.
-
-The widget also includes claimed, error, empty, and dismissed states. It can show coupon copy and a partner destination, and it has responsive desktop and mobile treatments.
+- **Not for me** — Recovery interaction; records a rejection and reveals two alternatives at the same time.
 
 The recovery interaction is the core product hypothesis. A carousel makes shoppers swipe through hidden choices and can turn a bad first match into silent abandonment. “Not for me” creates a low-cost signal, and two simultaneous alternatives let the shopper self-select without another swipe. The flow has one rejection round and a clear terminal exit so it does not become an endless recommendation loop.
 
+The widget also includes claimed, error, empty, and dismissed states. It can show coupon copy and a partner destination, and it has responsive desktop and mobile treatments.
+
 ### 2. Publisher-facing Offer Studio
 
-The Studio lets a publisher preview and configure alignment, density, typography, colors, container and button styling, custom button CSS, offer behavior, viewport, and widget state. It also includes a screenshot-to-theme flow that proposes design tokens for review before applying them.
+The Studio is built to ensure and inspire a publisher to design the widget such that it doesn't look like a Ad. It should feel like a native component well placed in a customers ecommerce journey.
+
+ A publisher can preview, configure alignment, density, typography, colors, container and button styling, custom button CSS, offer behavior, viewport, and widget state. 
+ 
+ It also includes a screenshot-to-theme flow that proposes design tokens for review before applying them.
 
 The product bet is that relevance is only half the experience. The offer must also feel credible and native to the confirmation page. Publisher-controlled styling makes that presentation reusable across placements without turning every integration into a bespoke design project.
 
@@ -81,6 +85,8 @@ The same widget is tested in two host environments: a desktop confirmation page 
 
 ### Publisher control and AI-assisted theming
 
+> Note: The AI-assisted theming feature is not available on the deployed link.
+
 Custom CSS stays available for the last mile of brand control. Screenshot analysis suggests a palette and typography tokens, but the publisher reviews them before applying anything.
 
 <table>
@@ -103,10 +109,10 @@ The decisions below come from the take-home assignment brief and the companion `
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The brief's A/B test showed **3-offer carousel: 2.9% CTR, 12% claim rate, $8.40 Rev/1K** versus **1-offer static: 3.6% CTR, 17% claim rate, $11.80 Rev/1K**.                                                               | Make one offer the default. It won on every reported metric, so alternatives should not compete with it before the shopper asks for another option. |
 | A shopper said, **“The first offer is rarely what I want, so I ignore the whole thing.”**                                                                                                                                  | Add “Not for me” so rejection becomes explicit engagement and a useful future matching signal instead of an invisible scroll-past.                  |
-| **72% of traffic is mobile**. Mobile performance is reported as **2.6% CTR / 10% claim**, versus **3.8% CTR / 16% claim** on desktop.                                                                                      | Design mobile first: compact cards, short copy, and a recovery layout that keeps both alternatives visible on a roughly 375px viewport.             |
+| **72% of traffic is mobile**. Mobile performance is reported as **2.6% CTR / 10% claim**, versus **3.8% CTR / 16% claim** on desktop.                                                                                      | We designed different layouts for devices and stylistic approaches to make sure it looks native device and brand             |
 | Position value dropped from **$18.20 to $4.60 to $1.10** as carousel position and swipe friction increased. The rationale correctly treats this as horizontal-reveal data, not proof that vertical scrolling always fails. | Avoid hidden or swipe-to-reveal alternatives. Recovery options appear simultaneously, with vertical stacking as the more discoverable fallback.     |
 | Shoppers said, **“I didn't realize I could swipe”** and **“I'd use it if it felt personalized to what I just bought.”**                                                                                                    | Remove the hidden-carousel interaction and treat purchase-anchored copy as a future relevance signal, not something generic ad copy can replace.    |
-| The widget appears immediately after checkout, when the shopper is still confirming the order.                                                                                                                             | Use a quiet, receipt-like hierarchy: merchant styling, clear value, explicit expiry, honest disclosure, and a dignified exit.                       |
+| The widget appears immediately after checkout, when the shopper is still confirming the order.                                                                                                                             | Inspire publishers to customise and integrate to as close as native with ease, receipt-like hierarchy: merchant styling, clear value, explicit expiry, honest disclosure, and a dignified exit.                       |
 | Rejection changes the model's confidence: its first guess was wrong.                                                                                                                                                       | Test two candidates after rejection as a deliberate hedge. This is not the same choice architecture as showing three competing offers up front.     |
 
 
@@ -114,11 +120,8 @@ The preview also exposes the basic production event vocabulary: `widget_viewed`,
 
 ## What I chose not to build
 
-- **Production deployment and persistence.** The Studio is session-only. Saving, publishing, permissions, approvals, version history, and real merchant integrations need Disco's account and platform model.
-- **Offer ranking and personalization.** The prototype uses fixed sample offers. Inventing a ranking model or synthetic customer graph would make the demo look more complete without producing useful evidence.
-- **Live inventory, eligibility, redemption, and attribution.** The coupon and destination actions demonstrate the flow, but do not verify a partner transaction.
-- **A full experimentation platform.** The Studio can render variants and states, but it does not assign traffic, persist exposure data, calculate lift, or enforce holdouts.
-- **A timed loading interstitial.** The rationale proposes testing 0ms versus roughly 600ms of honest “Finding a better match…” feedback. This prototype moves directly to recovery so it does not hard-code a potentially theatrical delay before that bet is tested.
+- **Adding timers, badges and tags.** The Studio is session-only. Saving, publishing, permissions, approvals, version history, and real merchant integrations need Disco's account and platform model.
+- **Offer ranking and personalization.** The prototype assumes inventing a ranking model or synthetic customer graph would make the demo look more complete without producing useful evidence.
 - **Purchase-anchored copy and rejection-reason chips.** “Because you ordered X…” is a strong future hypothesis. Reason chips such as “Not my style” or “Already have this” were left out because they add friction at the moment of disengagement.
 - **Ratings, social proof, video, and browsing.** These are separate trust and discovery experiments. Adding them now would make the first recovery test harder to interpret.
 - **Autonomous AI styling.** Theme extraction suggests a constrained token set and waits for publisher approval; it does not generate arbitrary CSS or publish changes.
@@ -152,7 +155,6 @@ The launch benchmark is **$11.80**, the known single-offer baseline. The recover
 - **Recovery choice split:** if roughly **85% or more** of recovery claims come from the top card, position bias dominates and one alternative may be enough. A more even split supports the two-candidate hedge.
 
 
-
 ### Trust and operational guardrails
 
 - Repeat engagement on a subsequent purchase.
@@ -162,12 +164,10 @@ The launch benchmark is **$11.80**, the known single-offer baseline. The recover
 - Abandonment during a future loading state.
 
 
-
 ### Planned experiments
 
 1. **One versus two recovery alternatives** — does post-rejection hedging outperform a single second guess?
 2. **0ms versus roughly 600ms loading feedback** — does perceived effort increase recovery claims or cause abandonment?
-3. **Purchase-anchored versus generic copy** — does “Because you ordered X…” provide enough relevance proof to change engagement?
 
 The experiment is working when Rev/1K beats **$11.80**, downstream redemption and repeat engagement improve, and page health, latency, and merchant trust remain within guardrails. A claim-rate increase on its own is not a win.
 

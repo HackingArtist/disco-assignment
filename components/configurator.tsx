@@ -67,6 +67,8 @@ interface ChoiceOption<Value extends string> {
   label: string;
   description: string;
   icon: LucideIcon;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 const CLAIM_ONLY_STATES = widgetStates.filter(
@@ -91,14 +93,21 @@ function ChoiceCards<Value extends string>({
       {options.map((option) => {
         const selected = value === option.value;
         const Icon = option.icon;
-        return (
-          <label key={option.value} className="studio-choice-card" data-selected={selected ? "true" : undefined}>
+        const disabled = Boolean(option.disabled);
+        const card = (
+          <label
+            className="studio-choice-card"
+            data-selected={selected ? "true" : undefined}
+            data-disabled={disabled ? "true" : undefined}
+            aria-disabled={disabled ? "true" : undefined}
+          >
             <input
               className="sr-only"
               type="radio"
               name={id}
               value={option.value}
               checked={selected}
+              disabled={disabled}
               onChange={() => onValueChange(option.value)}
             />
             <span className="studio-choice-card-icon" aria-hidden="true"><Icon /></span>
@@ -108,6 +117,13 @@ function ChoiceCards<Value extends string>({
             </span>
             <span className="studio-choice-card-check" aria-hidden="true"><Check /></span>
           </label>
+        );
+        if (!disabled) return <div key={option.value} className="studio-choice-card-slot">{card}</div>;
+        return (
+          <Tooltip key={option.value}>
+            <TooltipTrigger render={<div className="studio-choice-card-slot" />}>{card}</TooltipTrigger>
+            <TooltipContent side="top">{option.disabledReason ?? "Work in progress"}</TooltipContent>
+          </Tooltip>
         );
       })}
     </div>
@@ -837,9 +853,9 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
     <Tabs defaultValue="info" className="studio-config-tabs">
       <h1 className="sr-only">Offer widget</h1>
       <TabsList className="studio-tabs-list">
-        <TabsTrigger value="info">Info</TabsTrigger>
+        <TabsTrigger value="info">Offer Widget</TabsTrigger>
         <TabsTrigger value="theme">Theme</TabsTrigger>
-        <TabsTrigger value="behavior">Behavior</TabsTrigger>
+        <TabsTrigger value="behavior">Admin</TabsTrigger>
       </TabsList>
 
       <TabsContent value="info" className="studio-tab-content">
@@ -859,7 +875,7 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
                 value={config.behavior.alignment}
                 options={[
                   { value: "left", label: "Left", description: "Logo beside the copy", icon: AlignLeft },
-                  { value: "center", label: "Center", description: "Logo above centered copy", icon: AlignCenter },
+                  { value: "center", label: "Center", description: "Logo above centered copy", icon: AlignCenter, disabled: true },
                 ]}
                 onValueChange={(value) => updateBehavior("alignment", value)}
               />
@@ -876,7 +892,7 @@ function ConfigPanel({ config, setConfig, idPrefix }: ConfigPanelProps) {
                 value={config.behavior.density}
                 options={[
                   { value: "compact", label: "Space-aware", description: "Fits tighter spaces", icon: Minimize2 },
-                  { value: "roomy", label: "Roomy", description: "Adds more breathing room", icon: Maximize2 },
+                  { value: "roomy", label: "Roomy", description: "Adds more breathing room", icon: Maximize2, disabled: true },
                 ]}
                 onValueChange={(value) => updateBehavior("density", value)}
               />
