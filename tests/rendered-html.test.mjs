@@ -34,7 +34,7 @@ test("server-renders the configuration studio and default widget", async () => {
   assert.match(html, /Benefit unlocked by your Order/);
   assert.match(html, /Morrow/);
   assert.match(html, /premium trekking club membership/i);
-  assert.match(html, /Use my benefit/);
+  assert.match(html, /Claim now/);
   assert.doesNotMatch(html, /\$20 off/);
   assert.match(html, /Latest event/);
   assert.doesNotMatch(html, /class="demo-controller"/);
@@ -102,6 +102,9 @@ test("keeps configuration session-only and covers every widget state", async () 
   assert.match(configurator, /buildButtonCssPrefill/);
   assert.match(configurator, /syncOwnedCssDeclaration/);
   assert.match(configurator, /studio-button-css-badge/);
+  assert.match(configurator, /<Accordion/);
+  assert.match(configurator, /<AccordionTrigger/);
+  assert.match(configurator, /<span>Custom CSS<\/span>/);
   assert.doesNotMatch(configurator, /SectionHeading title="Custom button CSS"/);
   assert.match(css, /\.studio-theme-image-copy[^}]*font-size:\s*11px/);
   assert.match(configurator, /aria-label="Clear uploaded screenshot"/);
@@ -144,7 +147,8 @@ test("keeps configuration session-only and covers every widget state", async () 
   assert.match(css, /\.ow-button-quiet\s*\{[^}]*var\(--ow-secondary-button-stroke-width\)[^}]*var\(--ow-secondary-button-border\)/);
   assert.match(css, /\.ow-button-primary\s*\{[^}]*var\(--ow-primary-button-stroke-width\)[^}]*var\(--ow-primary-button-border\)/);
   assert.match(css, /\.studio-button-css-toggle\s*\{[^}]*width:\s*40px[^}]*height:\s*40px/);
-  assert.match(css, /\.studio-button-css-icon\[data-visible="true"\]/);
+  assert.match(css, /\.studio-button-css-row\s*\{[^}]*justify-content:\s*space-between/);
+  assert.match(css, /\.studio-button-css-toggle\[aria-expanded="true"\] > svg\s*\{[^}]*rotate\(45deg\)/);
   assert.match(css, /\.studio-button-component \+ \.studio-button-component\s*\{[^}]*box-shadow:\s*inset 0 1px/);
   assert.doesNotMatch(css, /\.studio-button-card\s*\{|\.studio-disclosure/);
   assert.match(css, /\.ow-density-compact \.ow-panel\s*\{[^}]*var\(--ow-container-stroke-width\)[^}]*border-radius:\s*var\(--ow-container-radius\)/);

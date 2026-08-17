@@ -171,7 +171,7 @@ export const defaultWidgetConfiguration: WidgetConfiguration = {
     title: "Your Morrow bottle benefit",
     detail: "Premium trekking club membership · 1 month free trial",
     expiry: "Your perk is available for the next 24 hours",
-    claimLabel: "Use my benefit",
+    claimLabel: "Claim now",
     couponCode: "MORROW20",
     destinationLabel: "Shop Morrow",
     image: {

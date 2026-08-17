@@ -7,7 +7,6 @@ import {
   AlignLeft,
   Braces,
   Check,
-  CodeXml,
   LockKeyhole,
   Maximize2,
   Minimize2,
@@ -23,6 +22,7 @@ import {
 
 import { PreviewCanvas } from "@/components/offer-widget";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -257,21 +257,6 @@ function ButtonCard({
     <section className="studio-button-component">
       <div className="studio-button-component-header">
         <h4>{title}</h4>
-        <button
-          type="button"
-          className="studio-button-css-toggle"
-          aria-expanded={expanded}
-          aria-label={`${expanded ? "Collapse" : "Expand"} ${title} custom CSS`}
-          onClick={onToggleExpanded}
-        >
-          {hasCustomCss && !expanded && <span className="studio-button-css-badge" aria-hidden="true" />}
-          <span className="studio-button-css-icon" data-visible={!expanded ? "true" : undefined} aria-hidden="true">
-            <Plus />
-          </span>
-          <span className="studio-button-css-icon" data-visible={expanded ? "true" : undefined} aria-hidden="true">
-            <CodeXml />
-          </span>
-        </button>
       </div>
       <div className="studio-button-component-controls">
         <ColorField id={`${idPrefix}-fill`} label={fill.label} value={fill.value} onChange={fill.onChange} />
@@ -279,15 +264,32 @@ function ButtonCard({
         <StudioSliderField id={`${idPrefix}-radius`} label={radius.label} value={radius.value} min={0} max={24} step={2} onChange={radius.onChange} />
         <StudioSliderField id={`${idPrefix}-stroke`} label={stroke.label} value={stroke.value} min={0} max={4} step={1} onChange={stroke.onChange} />
       </div>
-      {expanded && (
-        <CssEditor
-          id={`${idPrefix}-css`}
-          label="Custom CSS"
-          value={css}
-          placeholder={cssPlaceholder}
-          onChange={onCssChange}
-        />
-      )}
+      <Accordion
+        className="studio-button-css-accordion"
+        value={expanded ? ["css"] : []}
+        onValueChange={(value) => {
+          const nextExpanded = value.includes("css");
+          if (nextExpanded !== expanded) onToggleExpanded();
+        }}
+      >
+        <AccordionItem value="css">
+          <AccordionTrigger className="studio-button-css-row">
+            <span>Custom CSS</span>
+            <span className="studio-button-css-plus" aria-hidden="true">
+              {hasCustomCss && !expanded && <span className="studio-button-css-badge" />}
+              <Plus />
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <CssEditor
+              id={`${idPrefix}-css`}
+              value={css}
+              placeholder={cssPlaceholder}
+              onChange={onCssChange}
+            />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </section>
   );
 }
@@ -471,13 +473,11 @@ function highlightCss(source: string): ReactNode[] {
 
 function CssEditor({
   id,
-  label,
   value,
   placeholder,
   onChange,
 }: {
   id: string;
-  label: string;
   value: string;
   placeholder: string;
   onChange: (value: string) => void;
@@ -491,9 +491,6 @@ function CssEditor({
 
   return (
     <Field className="studio-field">
-      <div className="studio-field-heading">
-        <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      </div>
       <FieldControl>
         <div className="studio-code-editor">
           <div className="studio-code-toolbar">
